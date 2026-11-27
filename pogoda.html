@@ -768,6 +768,15 @@
             line-height: 1;
         }
         .fc-side-label.fc-xl { font-size: 0.5vw; letter-spacing: 0; }
+        /* v3.69: złota godzina – poświata przy zachodzie (różowo-pomarańczowa) i wschodzie (złota) */
+        #dayCharts.dusk .sun-arc-wrap, #dayCharts.dusk .sun-arc { filter: drop-shadow(0 0 10px rgba(255,120,60,.75)); transition: filter .8s; }
+        #dayCharts.dusk .sun-time.ss span { filter: drop-shadow(0 0 12px rgba(255,111,168,.9)); }
+        #dayCharts.dawn .sun-arc-wrap, #dayCharts.dawn .sun-arc { filter: drop-shadow(0 0 10px rgba(255,230,120,.75)); transition: filter .8s; }
+        #dayCharts.dawn .sun-time.sr span { filter: drop-shadow(0 0 12px rgba(255,230,120,.9)); }
+        /* v3.67: spadające kropelki nad słupkami opadów */
+        .da-drop-p { animation: daDrop 1.6s ease-in infinite; }
+        @keyframes daDrop { 0% { transform: translateY(-3px); opacity: 0; } 30% { opacity: 1; } 100% { transform: translateY(6px); opacity: 0; } }
+        body.no-dayfx .da-drop-p { animation: none; }
         .fc-side-label {
             font-family: 'Orbitron', sans-serif;
             font-size: 0.62vw;
@@ -2120,6 +2129,10 @@
         <div id="changelogInner" onclick="event.stopPropagation()">
             <div class="cl-top"><div><h2>📋 CHANGELOG</h2></div><button id="clX" onclick="closeChangelog()" aria-label="Zamknij">✕</button></div>
             <div class="cl-list">
+            <div class="cl-entry"><span class="cl-ver">v3.70</span><span class="cl-date">2026-11-27 13:00</span><div class="cl-desc">Nowe podpowiedzi pod osią dnia, każda z przełącznikiem w Ustawieniach: liczba godzin słońca, odliczanie do wschodu i zachodu, ostrzeżenie o zmianie temperatury w ciągu 6 h, „weź parasol”, podpowiedź na jutro, podsumowanie dnia po zachodzie.</div></div>
+            <div class="cl-entry"><span class="cl-ver">v3.69</span><span class="cl-date">2026-11-27 12:00</span><div class="cl-desc">Złota godzina: poświata na łuku przy wschodzie i zachodzie (do wyłączenia). Wskazówka „na spacer” i podpowiedź ubioru pod odczuwalną temperaturę. Opcjonalny wskaźnik pyłków (Open-Meteo). Każdy dodatek ma przełącznik w Ustawieniach.</div></div>
+            <div class="cl-entry"><span class="cl-ver">v3.68</span><span class="cl-date">2026-11-27 11:00</span><div class="cl-desc">Czwarty tryb osi: ciśnienie z trendem ▲/▼ z ostatnich 3 h. Baner ostrzega o deszczu w ciągu 3 h (niebieski). Nowy przełącznik w Ustawieniach: automatyczne przełączanie osi dnia co 5 min.</div></div>
+            <div class="cl-entry"><span class="cl-ver">v3.67</span><span class="cl-date">2026-11-27 10:00</span><div class="cl-desc">Oś dnia: większa ikona bieżącej godziny, znaczniki 00/06/12/18/24, spadające kropelki nad godzinami z opadami. Baner ostrzegawczy przy silnym wietrze, mrozie lub upale. Zapamiętany tryb osi (pogoda/temperatura/wiatr). Eksport i import ustawień w panelu Ustawień.</div></div>
             <div class="cl-entry"><span class="cl-ver">v3.66</span><span class="cl-date">2026-11-26 20:05</span><div class="cl-desc">Komendy głosowe pokazują, na którym etapie są (brak HTTPS, brak mikrofonu, błąd). Ostrzeżenie, gdy strona jest otwarta z pliku.</div></div>
             <div class="cl-entry"><span class="cl-ver">v3.65</span><span class="cl-date">2026-11-26 19:40</span><div class="cl-desc">Przycisk 🎙 przy ustawieniach włącza i wyłącza komendy głosowe jednym dotknięciem. Komunikaty o błędach po polsku, pokazywanie usłyszanego zdania.</div></div>
             <div class="cl-entry"><span class="cl-ver">v3.64</span><span class="cl-date">2026-11-26 19:10</span><div class="cl-desc">Komendy głosowe po polsku (Chrome): otwieranie stron, pogoda, tapeta, tło, gwiazdy, pokaz slajdów, ustawienia, zamykanie. Sterowanie gniazdkami przez Home Assistant (włącz / wyłącz). Nowa sekcja 9 „Głos i gniazdka”.</div></div>
@@ -3133,7 +3146,7 @@ function toggleHelp() {
 const TUYA_AUTH = { accessId: 'ktjgtmehdk7w7xyuxpn3', accessSecret: 'eda881d4ddea4103b2ff8f5bc8256f8c' };
 
 // ── USTAWIENIA (v3.0) ───────────────────────────────────────────────────────
-const APP_VERSION = '3.66';
+const APP_VERSION = '3.70';
 const DEFAULT_GEO = { lat: 52.879, lon: 18.693 };
 const SETTINGS_KEY = 'pogoda_settings_v3';
 const SETTINGS_DEFAULTS = {
@@ -3145,7 +3158,7 @@ const SETTINGS_DEFAULTS = {
     refreshMin: 30, swipe: true, slide1: true, slide2: true, slide3: true, slide4: true, slide5: true, slide6: true,
     dockMode: 'forecast', sound: 'neon', volume: 60, vibe: 50, swipeTh: 120, dockSwipeTh: 50,
     voice: false, haUrl: '', haToken: '', p1n: '', p1e: '', p2n: '', p2e: '', p3n: '', p3e: '', tipSec: 3, tipPulse: true,
-    showNames: true, showHolidays: true, showSunBlock: true, dayFx: true,
+    showNames: true, showHolidays: true, showSunBlock: true, dayFx: true, dayAuto: false, dayGlow: true, walkOn: true, clothOn: true, pollenOn: false, sunHrsOn: true, cdOn: true, chgOn: true, umbOn: true, shopOn: true, sumOn: true,
     cycleAnims: true, shiverEvery: 15, tileShineEvery: 10, cfgVer: 2
 };
 function loadSettings() {
@@ -3310,8 +3323,135 @@ function solarTimes(d, lat, lon) {
     const toD = x => new Date((x - 2440587.5) * 86400000);
     return { rise: toD(Jt - w / 360), set: toD(Jt + w / 360) };
 }
-let dayArcMode = 0, dayArcSig = '', dayArcData = null, dayArcTimer = null;
+let dayArcMode = (function () { try { return Math.max(0, Math.min(3, +(localStorage.getItem('pogoda_dayMode') || 0)) || 0); } catch (e) { return 0; } })(), dayArcSig = '', dayArcData = null, dayArcTimer = null;
 const DC = { x0: 10, x1: 590, base: 98, top: 46, n: 36 };
+// v3.69: dodatki – pyłki (Open-Meteo), wskazówka „na spacer”, podpowiedź ubioru
+let pollenData = null, pollenBusy = false;
+async function loadPollen() {
+    if (pollenBusy) return;
+    if (pollenData && Date.now() - pollenData.ts < 3600e3) return;
+    const g = GEO(); pollenBusy = true;
+    try {
+        const r = await fetch(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${g.lat}&longitude=${g.lon}&hourly=grass_pollen,birch_pollen,alder_pollen&timezone=GMT&forecast_days=2`);
+        const H = (await r.json()).hourly;
+        pollenData = { ts: Date.now(), items: H.time.map((ts, i) => ({ t: new Date(ts + ':00Z').getTime(), v: Math.max(H.grass_pollen[i] || 0, H.birch_pollen[i] || 0, H.alder_pollen[i] || 0) })) };
+    } catch (e) { pollenData = { ts: Date.now(), items: [] }; }
+    pollenBusy = false;
+}
+function dxExtras() {
+    const sb = document.getElementById('sunBottom');
+    if (!sb) return;
+    let box = document.getElementById('dxExtras');
+    if (!box) {
+        box = document.createElement('div');
+        box.id = 'dxExtras';
+        box.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:6px;font:600 13px Orbitron,sans-serif;color:#fff';
+        sb.insertAdjacentElement('afterend', box);
+    }
+    const d = dayArcData;
+    if (!d || !d.slots || !d.slots.length) { box.innerHTML = ''; return; }
+    const now = Date.now();
+    const sl = d.slots.reduce((b, x) => Math.abs(x.dt * 1000 - now) < Math.abs(b.dt * 1000 - now) ? x : b);
+    const T = sl.main.temp, W = ((sl.wind && sl.wind.speed) || 0) * 3.6;
+    const pill = (txt, col) => `<span style="padding:3px 10px;border-radius:12px;background:rgba(255,255,255,.1);border:1px solid ${col}">${txt}</span>`;
+    let html = '';
+    if (S.walkOn !== false) {
+        const wet = /Rain|Drizzle|Thunderstorm|Snow/.test((sl.weather && sl.weather[0] && sl.weather[0].main) || '');
+        let v, col;
+        if (wet || W >= 40 || T < -10 || T > 32) { v = 'raczej nie'; col = '#ff7a7a'; }
+        else if (W >= 25 || T < 0 || T > 27) { v = 'można'; col = '#ffcf33'; }
+        else { v = 'idealnie'; col = '#5cff8a'; }
+        html += pill('🚶 Na spacer: ' + v, col);
+    }
+    if (S.clothOn !== false) {
+        const fl = T - W * 0.08;
+        const c = fl < -10 ? 'kurtka zimowa 🧥' : fl < 5 ? 'ciepła kurtka 🧥' : fl < 12 ? 'kurtka 🧥' : fl < 18 ? 'bluza 👕' : fl < 24 ? 'koszulka 👕' : 'lekko 🩳';
+        html += pill('Ubierz: ' + c, '#9fd3ff');
+    }
+    if (S.pollenOn) {
+        loadPollen();
+        const it = pollenData && pollenData.items.length ? pollenData.items.reduce((b, x) => Math.abs(x.t - now) < Math.abs(b.t - now) ? x : b) : null;
+        if (it) {
+            const lv = it.v < 10 ? 'niskie' : it.v < 50 ? 'średnie' : 'wysokie';
+            const col = it.v < 10 ? '#5cff8a' : it.v < 50 ? '#ffcf33' : '#ff7a7a';
+            html += pill('🌿 Pyłki: ' + lv, col);
+        }
+    }
+    // v3.70: dodatkowe podpowiedzi (każda z przełącznikiem)
+    const on = k => S[k] !== false;
+    const dayStart = new Date(now); dayStart.setHours(0, 0, 0, 0);
+    const dStart = dayStart.getTime();
+    const todays = d.slots.filter(x => x.dt * 1000 >= dStart && x.dt * 1000 < dStart + 86400000);
+    const near = tm => d.slots.reduce((b, x) => Math.abs(x.dt * 1000 - tm) < Math.abs(b.dt * 1000 - tm) ? x : b);
+    const isWet = x => /Rain|Drizzle|Thunderstorm/.test((x.weather && x.weather[0] && x.weather[0].main) || '');
+    const isRainy = x => isWet(x) || ((x.rain && (x.rain['3h'] || x.rain['1h'])) > 0);
+    if (on('sunHrsOn') && d.t && todays.length) {
+        const sunny = todays.filter(x => x.dt * 1000 >= d.t.rise && x.dt * 1000 <= d.t.set && (x.clouds ? x.clouds.all : 50) < 30 && !isRainy(x)).length;
+        html += pill('☀ Słońca ok. ' + (sunny * 3) + ' h', '#ffe066');
+    }
+    if (on('cdOn') && d.t) {
+        const lab = now < d.t.rise ? 'wschód' : now < d.t.set ? 'zachód' : null;
+        if (lab) {
+            const mins = Math.round(((now < d.t.rise ? d.t.rise : d.t.set) - now) / 60000);
+            html += pill('⏳ ' + lab + ' za ' + Math.floor(mins / 60) + ' h ' + (mins % 60) + ' min', '#ffb347');
+        }
+    }
+    if (on('chgOn')) {
+        const diff = near(now + 6 * 3600e3).main.temp - T;
+        if (Math.abs(diff) > 5) html += pill((diff > 0 ? '▲ +' : '▼ ') + Math.round(diff) + '° za 6 h', diff > 0 ? '#ffb347' : '#9fd3ff');
+    }
+    if (on('umbOn') && d.slots.some(x => x.dt * 1000 >= now && x.dt * 1000 <= now + 6 * 3600e3 && isRainy(x))) {
+        html += pill('☂ Weź parasol', '#6ec8ff');
+    }
+    if (on('shopOn') && Array.isArray(hourlySlots)) {
+        const tStart = dStart + 86400000;
+        const tom = hourlySlots.filter(x => x.dt * 1000 >= tStart && x.dt * 1000 < tStart + 86400000);
+        if (tom.length) {
+            const adv = [];
+            if (tom.some(isWet)) adv.push('parasol');
+            if (Math.max(...tom.map(x => x.main.temp)) >= 18 && tom.some(x => (x.clouds ? x.clouds.all : 50) < 30)) adv.push('okulary');
+            if (Math.max(...tom.map(x => x.main.temp)) < 8) adv.push('płaszcz');
+            if (adv.length) html += pill('🛒 Jutro: ' + adv.join(', '), '#cfd8ff');
+        }
+    }
+    if (on('sumOn') && todays.length) {
+        const tv = todays.map(x => x.main.temp), wv = todays.map(x => ((x.wind && x.wind.speed) || 0) * 3.6);
+        const rec = { max: Math.round(Math.max(...tv)), min: Math.round(Math.min(...tv)), wind: Math.round(Math.max(...wv)) };
+        try { localStorage.setItem('pogoda_sum_' + dayStart.toISOString().slice(0, 10), JSON.stringify(rec)); } catch (e) {}
+        if (d.t && now > d.t.set) html += pill('📓 Max ' + rec.max + '° · Min ' + rec.min + '° · wiatr ' + rec.wind + ' km/h', '#d9c2ff');
+    }
+    box.innerHTML = html;
+}
+// v3.67: baner ostrzegawczy (silny wiatr, mróz, upał) dla bieżącej prognozy
+function wxAlertUpdate() {
+    const d = dayArcData;
+    let el = document.getElementById('wxAlert');
+    if (!el) {
+        el = document.createElement('div');
+        el.id = 'wxAlert';
+        el.style.cssText = 'display:none;position:absolute;top:-6px;left:0;right:0;margin:auto;width:max-content;z-index:50;padding:4px 12px;border-radius:14px;font:700 13px Orbitron,sans-serif;color:#fff;background:rgba(255,70,70,.88);box-shadow:0 0 14px rgba(255,70,70,.8);white-space:nowrap;pointer-events:none;animation:dfxPulse 1.4s ease-in-out infinite';
+        const box = document.getElementById('dayCharts');
+        if (box && box.parentNode) { if (getComputedStyle(box.parentNode).position === 'static') box.parentNode.style.position = 'relative'; box.parentNode.appendChild(el); }
+    }
+    if (!d || !d.slots || !d.slots.length) { el.style.display = 'none'; return; }
+    const now = Date.now();
+    const sl = d.slots.reduce((b, x) => Math.abs(x.dt * 1000 - now) < Math.abs(b.dt * 1000 - now) ? x : b);
+    const T = sl.main.temp, W = ((sl.wind && sl.wind.speed) || 0) * 3.6;
+    let msg = '';
+    if (W >= 50) msg = '⚠ Silny wiatr ' + Math.round(W) + ' km/h';
+    else if (T <= -15) msg = '⚠ Mróz ' + Math.round(T) + '°C';
+    else if (T >= 33) msg = '⚠ Upał ' + Math.round(T) + '°C';
+    if (!msg) {
+        const nxt = d.slots.find(x => x.dt * 1000 >= now - 1800e3 && x.dt * 1000 <= now + 3 * 3600e3 &&
+            (((x.rain && (x.rain['3h'] || x.rain['1h'])) > 0) || (x.weather && x.weather[0] && /Rain|Drizzle|Thunderstorm/.test(x.weather[0].main))));
+        if (nxt) {
+            const hrs = Math.max(0, Math.round((nxt.dt * 1000 - now) / 3600e3));
+            msg = '🌧 Deszcz ' + (hrs ? 'za ~' + hrs + ' h' : 'teraz');
+        }
+    }
+    el.style.background = msg && msg.startsWith('🌧') ? 'rgba(60,140,255,.88)' : 'rgba(255,70,70,.88)';
+    if (msg) { el.textContent = msg; el.style.display = 'block'; } else el.style.display = 'none';
+}
 function dayArcIcon(s) {
     const m = s.weather && s.weather[0] ? s.weather[0].main : 'Clear', c = s.clouds ? s.clouds.all : 0;
     if (m === 'Clear') return '☀️';
@@ -3374,16 +3514,24 @@ function renderDayBars() {
     const C = DC, span = d.dE - d.dS, n = d.slots.length, maxH = C.base - C.top;
     const xOf = tm => Math.max(C.x0, Math.min(C.x1, C.x0 + (tm - d.dS) / span * (C.x1 - C.x0)));
     let cv = '', lb = '';
-    const names = ['POGODA', 'TEMPERATURA °C', 'WIATR km/h'];
+    const names = ['POGODA', 'TEMPERATURA °C', 'WIATR km/h', 'CIŚNIENIE hPa'];
     lb += `<text class="da-title dl" style="text-anchor:start;--i:0" x="${C.x0 + 4}" y="16">${names[dayArcMode]}</text>`;
+    if (dayArcMode === 3 && d.slots && d.slots.length) {
+        const nw = Date.now();
+        const pick = tm => d.slots.reduce((b, x) => Math.abs(x.dt * 1000 - tm) < Math.abs(b.dt * 1000 - tm) ? x : b);
+        const dd = (pick(nw).main.pressure || 1013) - (pick(nw - 3 * 3600e3).main.pressure || 1013);
+        const ar = dd > 1 ? '▲' : dd < -1 ? '▼' : '►';
+        const col = dd > 1 ? '#5cff8a' : dd < -1 ? '#ff7a7a' : '#fff';
+        lb += `<text class="da-title dl" style="text-anchor:end;fill:${col}" x="${C.x1 - 4}" y="16">${ar} ${dd > 0 ? '+' : ''}${Math.round(dd)} hPa / 3 h</text>`;
+    }
     if (n) {
         const ts = d.slots.map(sl => sl.dt * 1000);
-        const vals = d.slots.map(sl => dayArcMode === 2 ? ((sl.wind && sl.wind.speed) || 0) * 3.6 : sl.main.temp);
+        const vals = d.slots.map(sl => dayArcMode === 2 ? ((sl.wind && sl.wind.speed) || 0) * 3.6 : dayArcMode === 3 ? (sl.main.pressure || 1013) : sl.main.temp);
         const vmin = Math.min(...vals), vmax = Math.max(...vals);
         const norm = v => dayArcMode === 2 ? Math.min(1, v / Math.max(20, vmax)) : (vmax - vmin < 0.5 ? 0.6 : (v - vmin) / (vmax - vmin));
         const hFor = v => maxH * (0.18 + 0.82 * norm(v));
         const yOf = v => C.base - hFor(v);
-        const colFor = dayArcMode === 1 ? dayArcTempColor : dayArcWindColor;
+        const colFor = dayArcMode === 1 ? dayArcTempColor : dayArcMode === 3 ? (() => '#b9a6ff') : dayArcWindColor;
         const valAt = tm => {
             if (tm <= ts[0]) return vals[0];
             for (let i = 1; i < n; i++) if (tm <= ts[i]) { const k = (tm - ts[i - 1]) / (ts[i] - ts[i - 1]); return vals[i - 1] + (vals[i] - vals[i - 1]) * k; }
@@ -3438,7 +3586,7 @@ function renderDayBars() {
         });
         if (dayArcMode === 0) {
             d.slots.forEach((sl, i) => {
-                lb += `<text class="da-ico dl" style="--i:${i + 1}" x="${xOf(sl.dt * 1000).toFixed(1)}" y="${(yOf(vals[i]) - 15).toFixed(1)}">${dayArcIcon(sl)}</text>`;
+                lb += `<text class="da-ico dl" style="--i:${i + 1};${Math.abs(ts[i] - Date.now()) < 1.5 * 3600e3 ? 'font-size:17px' : ''}" x="${xOf(sl.dt * 1000).toFixed(1)}" y="${(yOf(vals[i]) - 15).toFixed(1)}">${dayArcIcon(sl)}</text>`;
             });
         } else {
             if (dayArcMode === 2) {
@@ -3460,9 +3608,23 @@ function renderDayBars() {
     } else {
         lb += `<text class="da-title" x="300" y="60">brak prognozy</text>`;
     }
+    for (let h = 0; h <= 24; h += 6) {
+        const tm = d.dS + h * 3600e3;
+        lb += `<text class="da-hour" x="${xOf(tm).toFixed(1)}" y="${C.base + 30}" style="opacity:.55">${String(h).padStart(2, '0')}</text>`;
+    }
+    if (n && dayArcMode === 0) {
+        d.slots.forEach((sl, i) => {
+            const rn = (sl.rain && (sl.rain['3h'] || sl.rain['1h'])) || 0;
+            if (rn <= 0) return;
+            const sc = 0.6 + Math.min(1, rn / 5) * 0.8;
+            lb += `<g transform="translate(${xOf(sl.dt * 1000).toFixed(1)} ${(C.top - 6).toFixed(1)}) scale(${sc.toFixed(2)})"><path class="da-drop-p" d="M0 -6 C3 -1 4.5 1.5 4.5 3.5 A4.5 4.5 0 0 1 -4.5 3.5 C-4.5 1.5 -3 -1 0 -6 Z" fill="#6ec8ff" stroke="#fff" stroke-opacity=".5" stroke-width=".6"/></g>`;
+        });
+    }
     g.innerHTML = cv;
     lbl.innerHTML = lb;
     updateDayArc();
+    wxAlertUpdate();
+    dxExtras();
 }
 function updateDayArc() {
     const d = dayArcData, nw = document.getElementById('daNow');
@@ -3485,6 +3647,12 @@ function renderDayCharts() {
     const t = solarTimes(now, g.lat, g.lon);
     if (isNaN(t.rise) || isNaN(t.set)) return;
     const y = solarTimes(new Date(ref.getTime() - 86400000), g.lat, g.lon);
+    { const bx = document.getElementById('dayCharts');
+      if (bx) {
+        const dusk = S.dayGlow !== false && Math.abs(now - t.set) < 3600e3;
+        const dawn = S.dayGlow !== false && !dusk && Math.abs(now - t.rise) < 3600e3;
+        bx.classList.toggle('dusk', dusk); bx.classList.toggle('dawn', dawn);
+      } }
     const hm = dt => dt.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
     const lenMin = r => (r.set - r.rise) / 60000;
     const today = lenMin(t), diff = Math.round(today - lenMin(y));
@@ -3534,13 +3702,58 @@ function renderDayCharts() {
     if (!box) return;
     box.addEventListener('click', e => {
         e.stopPropagation();
-        dayArcMode = (dayArcMode + 1) % 3;
-        showToast(['Oś dnia: pogoda', 'Oś dnia: temperatura', 'Oś dnia: wiatr'][dayArcMode], ['⛅', '🌡️', '💨'][dayArcMode]);
+        dayArcMode = (dayArcMode + 1) % 4;
+        try { localStorage.setItem('pogoda_dayMode', dayArcMode); } catch (e) {}
+        showToast(['Oś dnia: pogoda', 'Oś dnia: temperatura', 'Oś dnia: wiatr', 'Oś dnia: ciśnienie'][dayArcMode], ['⛅', '🌡️', '💨', '🧭'][dayArcMode]);
         const g = document.getElementById('daCols'), l = document.getElementById('daLbl');
         if (g) g.classList.add('dc-out');
         if (l) l.classList.add('dc-out');
         clearTimeout(dayArcTimer);
         dayArcTimer = setTimeout(renderDayBars, 220);
+    });
+})();
+// v3.68: automatyczne przełączanie trybu osi co 5 min (gdy włączone w Ustawieniach)
+setInterval(() => {
+    if (!S.dayAuto) return;
+    dayArcMode = (dayArcMode + 1) % 4;
+    try { localStorage.setItem('pogoda_dayMode', dayArcMode); } catch (e) {}
+    renderDayBars();
+}, 5 * 60e3);
+// v3.67: eksport i import ustawień (plik JSON)
+(function () {
+    const panel = document.getElementById('settingsPanel');
+    if (!panel) return;
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:16px 0;';
+    const btn = 'padding:8px 14px;border-radius:10px;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.08);color:#fff;font:600 13px Orbitron,sans-serif;cursor:pointer';
+    wrap.innerHTML = `<button id="cfgExport" style="${btn}">Eksportuj ustawienia</button><button id="cfgImport" style="${btn}">Importuj ustawienia</button><input type="file" id="cfgFile" accept="application/json,.json" style="display:none">`;
+    panel.appendChild(wrap);
+    document.getElementById('cfgExport').addEventListener('click', () => {
+        const blob = new Blob([JSON.stringify(S, null, 2)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'pogoda-ustawienia.json';
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+        showToast('Ustawienia zapisane do pliku', '💾');
+    });
+    const file = document.getElementById('cfgFile');
+    document.getElementById('cfgImport').addEventListener('click', () => file.click());
+    file.addEventListener('change', () => {
+        const f = file.files && file.files[0];
+        if (!f) return;
+        const rd = new FileReader();
+        rd.onload = () => {
+            try {
+                const obj = JSON.parse(rd.result);
+                Object.keys(SETTINGS_DEFAULTS).forEach(k => { if (k in obj) S[k] = obj[k]; });
+                saveSettings();
+                applySettings();
+                showToast('Ustawienia wczytane', '✅');
+            } catch (e) { showToast('Nie udało się wczytać pliku', '⚠️'); }
+            file.value = '';
+        };
+        rd.readAsText(f);
     });
 })();
 setInterval(() => {
@@ -6903,6 +7116,17 @@ const SETTINGS_SECTIONS = [
         { t: 'toggle', key: 'showHolidays', label: 'Kartka z kalendarza (święta) na ekranie głównym' },
         { t: 'toggle', key: 'showSunBlock', label: 'Blok UV i wschód/zachód pod temperaturą (wył. = większa temperatura)' },
         { t: 'toggle', key: 'dayFx', label: 'Efekty osi dnia (połysk, puls „teraz”, wejście animacji)' },
+        { t: 'toggle', key: 'dayAuto', label: 'Automatyczne przełączanie osi dnia co 5 min' },
+        { t: 'toggle', key: 'dayGlow', label: 'Złota godzina: poświata przy wschodzie i zachodzie' },
+        { t: 'toggle', key: 'walkOn', label: 'Wskazówka „na spacer”' },
+        { t: 'toggle', key: 'clothOn', label: 'Podpowiedź ubioru pod odczuwalną temperaturę' },
+        { t: 'toggle', key: 'pollenOn', label: 'Pyłki (dane Open-Meteo, wymaga internetu)' },
+        { t: 'toggle', key: 'sunHrsOn', label: 'Liczba godzin słońca w ciągu dnia' },
+        { t: 'toggle', key: 'cdOn', label: 'Odliczanie do wschodu i zachodu' },
+        { t: 'toggle', key: 'chgOn', label: 'Ostrzeżenie o zmianie temperatury w ciągu 6 h' },
+        { t: 'toggle', key: 'umbOn', label: 'Podpowiedź „weź parasol” przy deszczu w ciągu 6 h' },
+        { t: 'toggle', key: 'shopOn', label: 'Podpowiedź na jutro (parasol, okulary, płaszcz)' },
+        { t: 'toggle', key: 'sumOn', label: 'Podsumowanie dnia po zachodzie (max, min, wiatr)' },
         { t: 'toggle', key: 'cycleAnims', label: 'Animacje cykliczne (temperatura: zimno, przyjemnie, gorąco)' },
         { t: 'select', key: 'tileShineEvery', label: 'Połysk kafelków menu co (po kolei)', num: true, options: [[0, 'Wyłączony'], [5, '5 s'], [10, '10 s'], [20, '20 s'], [30, '30 s']] },
         { t: 'select', key: 'shiverEvery', label: 'Animacja temperatury co', num: true, options: [[0, 'Wyłączone'], [15, '15 s'], [30, '30 s'], [60, '60 s']] },
