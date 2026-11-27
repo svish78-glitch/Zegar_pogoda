@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <title>Panel Transportowy - WAZE Pulse Final</title>
+    <style>
+        :root {
+            --neon-green: #1aff1a; 
+            --bg-color: #000000;
+            --shadow: 0 0 15px #1aff1a;
+            --font-main: 'Segoe UI', Roboto, sans-serif;
+            --font-mono: 'Consolas', monospace;
+            
+            --status-ok: #1aff1a;
+            --status-warn: #ffff00;
+            --status-info: #00ffff;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--neon-green);
+            font-family: var(--font-main);
+            margin: 0;
+            padding: 8px 15px;
+            overflow: hidden; 
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            box-sizing: border-box;
+        }
+
+        .clouds-container {
+            position: absolute; top: 0; left: 0; width: 100%; height: 50%;
+            overflow: hidden; z-index: -1; opacity: 0.12;
+        }
+
+        .cloud {
+            position: absolute; background: var(--neon-green);
+            filter: blur(50px); border-radius: 50%;
+            animation: move linear infinite;
+        }
+
+        @keyframes move {
+            from { transform: translateX(-300px); }
+            to { transform: translateX(110vw); }
+        }
+
+        .header {
+            text-align: center; font-size: 1.3em; font-weight: 900;
+            letter-spacing: 2px; text-transform: uppercase;
+            text-shadow: var(--shadow); margin-bottom: 5px;
+        }
+
+        .main-content {
+            display: grid; grid-template-columns: 1.6fr 1fr; 
+            gap: 12px; height: 80vh; min-height: 0;
+        }
+
+        .map-wrapper {
+            border: 2px solid var(--neon-green);
+            box-shadow: var(--shadow); background: #ffffff;
+            height: 100%; border-radius: 4px; overflow: hidden;
+        }
+
+        iframe { width: 100%; height: 100%; border: none; }
+
+        .routes-list { display: flex; flex-direction: column; gap: 6px; height: 100%; }
+
+        .route-card {
+            border: 1px solid rgba(26, 255, 26, 0.3);
+            padding: 8px 10px;
+            background: rgba(26, 255, 26, 0.05);
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: transform 0.1s ease, background 0.1s ease;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .route-card:active {
+            transform: scale(0.97);
+            background: rgba(26, 255, 26, 0.25);
+        }
+
+        .route-name {
+            font-size: 0.85em; font-weight: 800;
+            color: #ffffff; text-transform: uppercase;
+        }
+
+        .route-info {
+            font-size: 0.65em; line-height: 1.2;
+            opacity: 0.8; margin: 2px 0;
+        }
+
+        .time-status {
+            font-family: var(--font-mono); letter-spacing: 1px;
+            display: flex; align-items: baseline; gap: 8px;
+        }
+
+        .status-label { font-size: 0.55em; font-weight: 400; opacity: 0.7; }
+
+        /* OPIS STATUSU - 2x większy od etykiety */
+        .pulse-text {
+            display: inline-block; opacity: 0.3;
+            font-weight: 900; font-size: 1.15em; 
+            animation: ultra-flash 4s infinite; 
+        }
+
+        @keyframes ultra-flash {
+            0%, 20%, 100% { opacity: 0.3; filter: blur(0px); text-shadow: none; }
+            10% { opacity: 1; filter: blur(0.2px); text-shadow: 0 0 12px currentColor, 0 0 20px currentColor; }
+        }
+
+        .status-ok { color: var(--status-ok); }
+        .status-warn { color: var(--status-warn); }
+        .status-info { color: var(--status-info); }
+
+        /* Synchronizacja sekwencyjna (co 1 sekundę) */
+        .card-1 .pulse-text { animation-delay: 0s; }
+        .card-2 .pulse-text { animation-delay: 1s; }
+        .card-3 .pulse-text { animation-delay: 2s; }
+        .card-4 .pulse-text { animation-delay: 3s; }
+
+        .footer { margin-top: auto; padding: 5px 0; display: flex; justify-content: flex-end; }
+
+        .last-update {
+            font-size: 0.65em; opacity: 0.6; letter-spacing: 1px;
+            font-family: var(--font-mono); margin-top: 20px;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="clouds-container">
+        <div class="cloud" style="width: 200px; height: 60px; top: 10%; left: -50px; animation-duration: 25s;"></div>
+    </div>
+
+    <div class="header">TRAFFIC CONTROL // NEURAL LINK</div>
+
+    <div class="main-content">
+        <div class="map-wrapper">
+            <iframe id="waze-map" src="https://embed.waze.com/iframe?zoom=12&lat=52.880&lon=18.720&pin=1" allowfullscreen></iframe>
+        </div>
+
+        <div class="routes-list">
+            <div class="route-card card-1" onclick="forceRefresh()">
+                <div class="route-name">WĘZEŁ CIECHOCINEK (A1)</div>
+                <div class="route-info">Odolion: wjazd i zjazd z autostrady.</div>
+                <div class="time-status">
+                    <span class="status-label">> STATUS:</span>
+                    <span class="pulse-text status-ok">BEZ ZATORÓW</span>
+                </div>
+            </div>
+            <div class="route-card card-2" onclick="forceRefresh()">
+                <div class="route-name">KIERUNEK TORUŃ (DK91)</div>
+                <div class="route-info">Wjazd przez Stawki. Główne arterie.</div>
+                <div class="time-status">
+                    <span class="status-label">> STATUS:</span>
+                    <span class="pulse-text status-ok">PŁYNNIE</span>
+                </div>
+            </div>
+            <div class="route-card card-3" onclick="forceRefresh()">
+                <div class="route-name">KIERUNEK WŁOCŁAWEK</div>
+                <div class="route-info">Wylot południowy (Nowy Ciechocinek).</div>
+                <div class="time-status">
+                    <span class="status-label">> STATUS:</span>
+                    <span class="pulse-text status-ok">TRASA WOLNA</span>
+                </div>
+            </div>
+            <div class="route-card card-4" onclick="forceRefresh()">
+                <div class="route-name">CENTRUM ALEKSANDRÓW</div>
+                <div class="route-info">Monitoring przejazdów kolejowych.</div>
+                <div class="time-status">
+                    <span class="status-label">> STATUS:</span>
+                    <span class="pulse-text status-warn">RUCH ŚREDNI</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <div class="last-update" id="sync-time">REGION_SCAN // 16:15:00</div>
+    </div>
+
+    <script>
+        function forceRefresh() {
+            window.location.reload(true);
+        }
+
+        function updateClock() {
+            const now = new Date();
+            const timeStr = now.getHours().toString().padStart(2, '0') + ":" + 
+                            now.getMinutes().toString().padStart(2, '0') + ":" + 
+                            now.getSeconds().toString().padStart(2, '0');
+            document.getElementById('sync-time').innerText = "REGION_SCAN // " + timeStr;
+        }
+
+        updateClock();
+        setInterval(forceRefresh, 300000);
+    </script>
+</body>
+</html>
+

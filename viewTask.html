@@ -1,0 +1,1580 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ViewPlus Dashboard - Kino Local Edition</title>
+    <style>
+        /*
+          ===== INSTRUKCJA DLA AI (dowolny model) =====
+          1) WERSJONOWANIE: Ten plik MUSI mieć numer wersji widoczny w UI (patrz #version-badge).
+             Przy KAŻDEJ zmianie w kodzie: zwiększ APP_VERSION w <script> i dodaj wpis na GÓRZE
+             tablicy CHANGELOG (najnowsze u góry). Kliknięcie w badge wersji otwiera modal z historią zmian.
+          2) MOTYWY KOLORYSTYCZNE: Zawsze utrzymuj DOKŁADNIE 4 gotowe motywy — 2 jasne + 2 ciemne
+             (patrz sekcja [data-theme]) — ORAZ możliwość ustawienia własnego koloru akcentu (accent picker,
+             zapisywany w localStorage jako "customAccent"). Nie usuwaj tej funkcji przy edycjach.
+          ================================================
+        */
+        :root {
+            --neon-green: #39ff14;
+            --light-neon: #a2ff8d; 
+            --warn-yellow: #f1ff14;
+            --warn-orange: #ff9900; 
+            --brightness: 1.05;
+            --bg-main: #000;
+            --text-main: #fff;
+            --tile-border: rgba(255,255,255,0.1);
+            --popup-bg: #111;
+        }
+
+        /* ===== 4 MOTYWY: 2 jasne + 2 ciemne ===== */
+        [data-theme="dark-neon"] {
+            --neon-green: #39ff14; --light-neon: #a2ff8d;
+            --bg-main: #000; --text-main: #fff;
+            --tile-border: rgba(255,255,255,0.1); --popup-bg: #111;
+        }
+        [data-theme="dark-cyan"] {
+            --neon-green: #14e6ff; --light-neon: #8df4ff;
+            --bg-main: #060912; --text-main: #eafcff;
+            --tile-border: rgba(20,230,255,0.15); --popup-bg: #0c1420;
+        }
+        [data-theme="light-mint"] {
+            --neon-green: #12b76a; --light-neon: #067a47;
+            --bg-main: #f4faf7; --text-main: #0d1f17;
+            --tile-border: rgba(18,183,106,0.25); --popup-bg: #ffffff;
+        }
+        [data-theme="light-coral"] {
+            --neon-green: #ff5c5c; --light-neon: #c62828;
+            --bg-main: #fff6f5; --text-main: #241010;
+            --tile-border: rgba(255,92,92,0.25); --popup-bg: #ffffff;
+        }
+        /* Własny akcent użytkownika nadpisuje --neon-green/--light-neon niezależnie od motywu */
+        [data-custom-accent="1"] {
+            --neon-green: var(--custom-accent, #39ff14);
+            --light-neon: var(--custom-accent-light, #a2ff8d);
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg-main);
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+            filter: brightness(var(--brightness));
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            transition: background 0.3s ease, color 0.3s ease;
+        }
+
+        #screens-wrapper {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            width: 200vw;
+            height: 100vh;
+            transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+            will-change: transform;
+        }
+
+        .screen {
+            width: 100vw;
+            height: 100vh;
+            flex-shrink: 0;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #screen-indicator {
+            position: fixed;
+            bottom: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 8px;
+            z-index: 200;
+            pointer-events: none;
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: rgba(57, 255, 20, 0.3);
+            border: 1px solid rgba(57, 255, 20, 0.5);
+            transition: all 0.3s ease;
+        }
+
+        .dot.active {
+            background: var(--neon-green);
+            box-shadow: 0 0 8px var(--neon-green);
+        }
+
+        @keyframes screenFlash {
+            0% { opacity: 0.6; }
+            100% { opacity: 1; }
+        }
+
+        .bg-clouds {
+            position: absolute;
+            top: 0; width: 100%; height: 50vh; 
+            z-index: 0; pointer-events: none; overflow: hidden;
+        }
+
+        .cloud {
+            position: absolute;
+            background: rgba(57, 255, 20, 0.1);
+            filter: blur(60px);
+            border-radius: 50%;
+            animation: float 25s infinite alternate;
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            padding: 25px 15px 20px 55px; 
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            box-sizing: border-box;
+        }
+
+        .title-main {
+            font-size: 28px;
+            font-weight: 900;
+            text-transform: uppercase;
+            color: var(--neon-green);
+            margin-bottom: 15px;
+            letter-spacing: 6px;
+            cursor: pointer;
+            text-shadow: 0 0 15px var(--neon-green);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .screen-num {
+            font-size: 12px;
+            font-weight: 700;
+            color: rgba(57, 255, 20, 0.5);
+            letter-spacing: 3px;
+            margin-left: 4px;
+        }
+
+        /* Wskaźnik sync */
+        #sync-status {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            padding: 4px 10px;
+            border-radius: 20px;
+            transition: all 0.4s ease;
+        }
+        #sync-status.ok      { color: var(--neon-green); border: 1px solid rgba(57,255,20,0.4); }
+        #sync-status.syncing { color: var(--warn-yellow); border: 1px solid rgba(241,255,20,0.4); animation: blink 0.8s infinite; }
+        #sync-status.error   { color: var(--warn-orange); border: 1px solid rgba(255,153,0,0.4); }
+
+        /* Przyciski w nagłówku (wersja / motyw / narzędzia) */
+        .hdr-btn {
+            font-size: 13px;
+            font-weight: 800;
+            padding: 5px 11px;
+            border-radius: 20px;
+            border: 1px solid rgba(255,255,255,0.2);
+            background: rgba(0,0,0,0.45);
+            color: var(--text-main);
+            cursor: pointer;
+            user-select: none;
+            line-height: 1;
+            white-space: nowrap;
+        }
+        .hdr-btn:active { opacity: 0.7; }
+        #version-badge.hdr-btn {
+            color: var(--neon-green);
+            border-color: rgba(57,255,20,0.35);
+        }
+
+        .grid {
+            position: relative;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            flex-grow: 1;
+            max-height: 80vh;
+        }
+
+        .tile {
+            position: relative;
+            background-size: cover;
+            background-position: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 28px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 20px 15px;
+            cursor: pointer;
+            transition: all 0.4s ease;
+        }
+
+        .tile::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(180deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.75) 100%);
+            z-index: 2;
+        }
+
+        .tile.needs-attention {
+            border: 1px solid rgba(255, 153, 0, 0.4);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+        }
+
+        .tile.overdue {
+            border: 2px solid var(--warn-orange);
+            z-index: 5;
+            animation: overduePulse 2s infinite ease-in-out;
+        }
+
+        @keyframes overduePulse {
+            0%   { box-shadow: 0 0 15px rgba(255,153,0,0.4), inset 0 0 10px rgba(255,153,0,0.2); border-color: rgba(255,153,0,0.6); }
+            50%  { box-shadow: 0 0 40px rgba(255,153,0,0.8), inset 0 0 20px rgba(255,153,0,0.5); border-color: rgba(255,153,0,1); }
+            100% { box-shadow: 0 0 15px rgba(255,153,0,0.4), inset 0 0 10px rgba(255,153,0,0.2); border-color: rgba(255,153,0,0.6); }
+        }
+
+        /* ===== POPUP ===== */
+        #popup-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.9);
+            backdrop-filter: blur(10px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+
+        .popup-box {
+            background: #111;
+            border: 2px solid var(--neon-green);
+            border-radius: 30px;
+            padding: 25px;
+            text-align: center;
+            width: 85%;
+            max-width: 350px;
+            box-shadow: 0 0 40px rgba(57, 255, 20, 0.3);
+        }
+
+        .popup-question {
+            font-size: 18px;
+            font-weight: 800;
+            margin-bottom: 20px;
+            color: #fff;
+            text-transform: uppercase;
+        }
+
+        .popup-btns {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 14px;
+            border: none;
+            border-radius: 12px;
+            font-weight: 900;
+            text-transform: uppercase;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .btn-yes { background: var(--neon-green); color: #000; }
+        .btn-no  { background: #222; color: #fff; }
+        .btn-edit { background: transparent; color: var(--neon-green); border: 1px solid var(--neon-green); margin-top: 5px; padding: 14px; border-radius: 12px; font-weight: 900; text-transform: uppercase; cursor: pointer; font-size: 14px; }
+
+        #manual-date-container {
+            display: none;
+            margin-top: 15px;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        input[type="date"] {
+            background: #222;
+            border: 1px solid var(--neon-green);
+            color: #fff;
+            padding: 10px;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 16px;
+            text-align: center;
+        }
+
+        /* ===== TILE LAYOUT ===== */
+        .tile-top { position: relative; z-index: 3; width: 100%; }
+        .tile-mid { position: relative; z-index: 3; text-align: center; margin-top: 10%; }
+        .tile-bottom { 
+            position: relative; z-index: 4; display: flex; 
+            justify-content: space-between; align-items: flex-end; 
+            width: 100%; margin-bottom: 8%; 
+        }
+
+        .label { 
+            font-size: 20px; 
+            font-weight: 900; 
+            text-transform: uppercase; 
+            color: var(--light-neon); 
+            text-shadow: 0 0 8px rgba(162, 255, 141, 0.6); 
+        }
+
+        .counter { 
+            font-size: 42px; 
+            font-weight: 900; 
+            color: var(--neon-green); 
+            text-shadow: 0 0 20px rgba(0,0,0,1), 0 0 10px var(--neon-green); 
+            line-height: 1;
+        }
+        .counter small {
+            font-size: 50%; 
+            text-transform: uppercase;
+            margin-left: 4px;
+            opacity: 0.8;
+        }
+
+        .counter-sub {
+            display: block;
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--light-neon);
+            margin-top: 5px;
+            opacity: 0.9;
+        }
+
+        .sub-date { font-size: 13px; font-weight: 800; color: #fff; line-height: 1.1; text-shadow: 1px 1px 5px #000; text-transform: uppercase; }
+        
+        .status-box { 
+            font-size: 11px; 
+            font-weight: 900; 
+            padding: 4px 8px; 
+            border-radius: 6px; 
+            text-transform: uppercase; 
+            color: var(--warn-orange); 
+            border: 1.5px solid var(--warn-orange); 
+            background: rgba(0,0,0,0.7); 
+        }
+
+        .st-warn   { color: #fff; background: var(--warn-orange); animation: blink 1s infinite; border: none; }
+        .st-custom { color: var(--warn-orange); font-size: 11px; font-weight: 800; text-align: right; text-shadow: 0 0 5px var(--warn-orange); }
+        
+        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.5; } }
+        @keyframes float { from { transform: translate(0, 0); } to { transform: translate(40px, 20px); } }
+
+        .tile-placeholder {
+            border: 1px dashed rgba(57, 255, 20, 0.2);
+            background: rgba(57, 255, 20, 0.03);
+        }
+        .tile-placeholder .label  { color: rgba(57, 255, 20, 0.3); }
+        .tile-placeholder .counter { color: rgba(57, 255, 20, 0.3); font-size: 28px; }
+
+        /* ===== VERSION BADGE + CHANGELOG MODAL ===== */
+
+        #changelog-overlay, #theme-overlay, #tools-overlay, #editor-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(10px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 300;
+        }
+
+        .modal-box {
+            background: var(--popup-bg);
+            border: 2px solid var(--neon-green);
+            border-radius: 24px;
+            padding: 22px;
+            width: 88%;
+            max-width: 380px;
+            max-height: 75vh;
+            overflow-y: auto;
+            color: var(--text-main);
+            box-shadow: 0 0 40px rgba(57,255,20,0.25);
+        }
+
+        .modal-box h3 {
+            margin: 0 0 14px 0;
+            color: var(--neon-green);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-size: 16px;
+        }
+
+        .changelog-entry {
+            border-left: 2px solid var(--neon-green);
+            padding: 4px 0 12px 12px;
+            margin-bottom: 10px;
+        }
+        .changelog-entry .cv { font-weight: 900; font-size: 13px; color: var(--neon-green); }
+        .changelog-entry .cd { font-size: 10px; opacity: 0.6; margin-left: 6px; }
+        .changelog-entry ul { margin: 6px 0 0 0; padding-left: 16px; font-size: 12px; opacity: 0.85; }
+
+        .modal-close-btn {
+            margin-top: 10px;
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 12px;
+            background: var(--neon-green);
+            color: #000;
+            font-weight: 900;
+            text-transform: uppercase;
+            cursor: pointer;
+        }
+
+        .theme-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 14px; }
+        .theme-swatch {
+            border: 2px solid rgba(255,255,255,0.15);
+            border-radius: 14px;
+            padding: 10px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 800;
+            text-align: center;
+            text-transform: uppercase;
+        }
+        .theme-swatch.active { border-color: var(--neon-green); box-shadow: 0 0 12px rgba(57,255,20,0.4); }
+        .theme-swatch .dot-preview { width: 22px; height: 22px; border-radius: 50%; margin: 0 auto 6px; }
+
+        .accent-row { display: flex; align-items: center; gap: 10px; font-size: 12px; }
+        .accent-row input[type="color"] { width: 42px; height: 32px; border: none; border-radius: 8px; background: none; cursor: pointer; }
+        .accent-reset { font-size: 11px; opacity: 0.7; text-decoration: underline; cursor: pointer; }
+
+        /* Tools & Editor */
+        .tools-btns { display: flex; flex-direction: column; gap: 10px; }
+        .tools-btns .btn { width: 100%; }
+
+        .editor-form label {
+            display: block;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin: 12px 0 4px;
+            opacity: 0.8;
+        }
+        .editor-form input[type="text"],
+        .editor-form input[type="number"],
+        .editor-form input[type="url"],
+        .editor-form select {
+            width: 100%;
+            box-sizing: border-box;
+            background: #222;
+            border: 1px solid var(--neon-green);
+            color: #fff;
+            padding: 10px 12px;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 14px;
+        }
+        .editor-form .row-check {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 12px;
+            font-size: 13px;
+        }
+        .editor-form .row-check input { width: 18px; height: 18px; }
+
+        .tile-list-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 12px;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            font-weight: 700;
+            font-size: 14px;
+        }
+        .tile-list-item:hover { border-color: var(--neon-green); }
+    </style>
+</head>
+<body>
+
+    <div id="screen-indicator">
+        <div class="dot active" id="dot-0"></div>
+        <div class="dot" id="dot-1"></div>
+        <div class="dot" id="dot-2"></div>
+    </div>
+
+    <!-- Changelog modal -->
+    <div id="changelog-overlay">
+        <div class="modal-box">
+            <h3>Historia zmian</h3>
+            <div id="changelog-list"></div>
+            <button class="modal-close-btn" onclick="closeChangelog()">ZAMKNIJ</button>
+        </div>
+    </div>
+
+    <!-- Theme picker modal -->
+    <div id="theme-overlay">
+        <div class="modal-box">
+            <h3>Motyw kolorystyczny</h3>
+            <div class="theme-grid" id="theme-grid"></div>
+            <div class="accent-row">
+                <input type="color" id="accent-picker" value="#39ff14">
+                <span>Własny kolor akcentu</span>
+            </div>
+            <div class="accent-reset" onclick="resetAccent()">Wyłącz własny kolor</div>
+            <button class="modal-close-btn" onclick="closeThemePicker()">ZAMKNIJ</button>
+        </div>
+    </div>
+
+    <!-- Tools modal -->
+    <div id="tools-overlay">
+        <div class="modal-box">
+            <h3>Narzędzia</h3>
+            <div class="tools-btns">
+                <button class="btn btn-yes" onclick="exportTasks()">📥 Eksportuj dane (JSON)</button>
+                <button class="btn btn-no" onclick="document.getElementById('import-file').click()">📤 Importuj dane (JSON)</button>
+                <input type="file" id="import-file" accept=".json,application/json" style="display:none" onchange="importTasks(event)">
+                <button class="btn btn-edit" onclick="openTileEditorList()">✏️ Edytor kafelków</button>
+                <button class="btn btn-no" onclick="pingKeepAlive(true)">🔄 Ping bazy (keep-alive)</button>
+            </div>
+            <button class="modal-close-btn" onclick="closeTools()">ZAMKNIJ</button>
+        </div>
+    </div>
+
+    <!-- Tile editor list -->
+    <div id="editor-overlay">
+        <div class="modal-box" id="editor-box">
+            <h3 id="editor-title">Edytor kafelków</h3>
+            <div id="editor-content"></div>
+            <button class="modal-close-btn" onclick="closeEditor()">ZAMKNIJ</button>
+        </div>
+    </div>
+
+    <!-- Popup -->
+    <div id="popup-overlay">
+        <div class="popup-box">
+            <div id="popup-text" class="popup-question">Czy zadanie wykonane?</div>
+            <div id="main-btns" class="popup-btns">
+                <button class="btn btn-yes" id="btn-confirm">TAK</button>
+                <button class="btn btn-no"  id="btn-cancel">NIE</button>
+                <button class="btn-edit"    id="btn-manual-trigger">Zmień datę ręcznie</button>
+            </div>
+            <div id="manual-date-container">
+                <input type="date" id="calendar-input">
+                <button class="btn btn-yes" id="btn-save-manual">ZAPISZ DATĘ</button>
+                <button class="btn btn-no"  id="btn-back">WRÓĆ</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- WRAPPER 3 EKRANÓW -->
+    <div id="screens-wrapper">
+
+        <!-- EKRAN 1 -->
+        <div class="screen" id="screen-0">
+            <div class="bg-clouds" id="clouds-0"></div>
+            <div class="container">
+                <div class="title-main">
+                    <span onclick="toggleFullScreen()">Terminarz <span class="screen-num">1/3</span></span>
+                    <span id="sync-status" class="ok">●&nbsp;SYNC</span>
+                    <span id="version-badge" class="hdr-btn" onclick="openChangelog()">v--</span>
+                    <span id="theme-fab" class="hdr-btn" onclick="openThemePicker()">🎨</span>
+                    <span id="tools-fab" class="hdr-btn" onclick="openTools()">⚙️</span>
+                </div>
+
+                <div class="grid" id="main-grid">
+                    <div class="tile" id="tile-kuweta" style="background-image: url('https://images.unsplash.com/photo-1516750105099-4b8a83e217ee?q=80&w=400&auto=format&fit=crop');">
+                        <div class="tile-top"><div class="label" data-key="kuweta">Kuweta</div></div>
+                        <div class="tile-mid"><div class="counter" id="val-kuweta">--</div></div>
+                        <div class="tile-bottom">
+                            <div class="sub-date" id="date-kuweta">--</div>
+                            <div class="status-box" id="msg-kuweta">OK</div>
+                        </div>
+                    </div>
+
+                    <div class="tile" id="tile-liquid" style="background-image: url('https://images.unsplash.com/photo-1550147760-44c9966d6bc7?q=80&w=400&auto=format&fit=crop');">
+                        <div class="tile-top"><div class="label" data-key="liquid">Liquid</div></div>
+                        <div class="tile-mid"><div class="counter" id="val-liquid">--</div></div>
+                        <div class="tile-bottom">
+                            <div class="sub-date" id="date-liquid">--</div>
+                            <div class="status-box" id="msg-liquid">OK</div>
+                        </div>
+                    </div>
+
+                    <div class="tile" id="tile-floor" style="background-image: url('podloga.png');">
+                        <div class="tile-top"><div class="label" data-key="floor">Podłoga</div></div>
+                        <div class="tile-mid"><div class="counter" id="val-floor">--</div></div>
+                        <div class="tile-bottom">
+                            <div class="sub-date" id="date-floor">--</div>
+                            <div class="status-box" id="msg-floor">OK</div>
+                        </div>
+                    </div>
+
+                    <div class="tile" id="tile-gaz" style="background-image: url('gaz.png');">
+                        <div class="tile-top"><div class="label" data-key="gaz">Gaz</div></div>
+                        <div class="tile-mid"><div class="counter" id="val-gaz">--</div></div>
+                        <div class="tile-bottom">
+                            <div class="sub-date" id="date-gaz">--</div>
+                            <div class="status-box" id="msg-gaz">OK</div>
+                        </div>
+                    </div>
+
+                    <div class="tile" id="tile-kino" style="background-image: url('kino.png');">
+                        <div class="tile-top"><div class="label" data-key="kino">Kino</div></div>
+                        <div class="tile-mid"><div class="counter" id="val-kino">--</div></div>
+                        <div class="tile-bottom">
+                            <div class="sub-date" id="date-kino">--</div>
+                            <div class="status-box" id="msg-kino" style="display:none">OK</div>
+                        </div>
+                    </div>
+
+                    <div class="tile" id="tile-las" style="background-image: url('https://images.unsplash.com/photo-1441974231531-c6227db76b6e?q=80&w=400&auto=format&fit=crop');">
+                        <div class="tile-top"><div class="label" data-key="las">Plener z aparatem</div></div>
+                        <div class="tile-mid">
+                            <div class="counter" id="val-las">--</div>
+                            <div class="counter-sub" id="sub-val-las"></div>
+                        </div>
+                        <div class="tile-bottom">
+                            <div class="sub-date" id="date-las">--</div>
+                            <div class="st-custom">kiedy następny plener?</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- EKRAN 2 -->
+        <div class="screen" id="screen-1">
+            <div class="bg-clouds" id="clouds-1"></div>
+            <div class="container">
+                <div class="title-main" onclick="toggleFullScreen()">Razem <span class="screen-num">2/3</span></div>
+
+                <div class="grid">
+                    <div class="tile" id="tile-spacer" style="background-image: url('https://images.unsplash.com/photo-1448375240586-882707db888b?q=80&w=400&auto=format&fit=crop');">
+                        <div class="tile-top"><div class="label" data-key="spacer">Wspólny spacer</div></div>
+                        <div class="tile-mid">
+                            <div class="counter" id="val-spacer">--</div>
+                            <div class="counter-sub" id="sub-val-spacer"></div>
+                        </div>
+                        <div class="tile-bottom">
+                            <div class="sub-date" id="date-spacer">--</div>
+                            <div class="st-custom">kiedy następny?</div>
+                        </div>
+                    </div>
+
+                    <div class="tile" id="tile-soda" style="background-image: url('https://images.unsplash.com/photo-1523362628745-0c100150b504?q=80&w=400&auto=format&fit=crop');">
+                        <div class="tile-top"><div class="label" data-key="soda">Soda Stream</div></div>
+                        <div class="tile-mid"><div class="counter" id="val-soda">--</div></div>
+                        <div class="tile-bottom">
+                            <div class="sub-date" id="date-soda">--</div>
+                            <div class="status-box" id="msg-soda">OK</div>
+                        </div>
+                    </div>
+
+                    <div class="tile" id="tile-resto" style="background-image: url('https://images.unsplash.com/photo-1414235077428-338989a2e8c0?q=80&w=400&auto=format&fit=crop');">
+                        <div class="tile-top"><div class="label" data-key="resto">Restauracja</div></div>
+                        <div class="tile-mid">
+                            <div class="counter" id="val-resto">--</div>
+                            <div class="counter-sub" id="sub-val-resto"></div>
+                        </div>
+                        <div class="tile-bottom">
+                            <div class="sub-date" id="date-resto">--</div>
+                            <div class="st-custom">kiedy następna?</div>
+                        </div>
+                    </div>
+
+                    <div class="tile" id="tile-gaming" style="background-image: url('https://images.unsplash.com/photo-1493711662062-fa541adb3fc8?q=80&w=400&auto=format&fit=crop');">
+                        <div class="tile-top"><div class="label" data-key="gaming">Gaming</div></div>
+                        <div class="tile-mid">
+                            <div class="counter" id="val-gaming">--</div>
+                            <div class="counter-sub" id="sub-val-gaming"></div>
+                        </div>
+                        <div class="tile-bottom">
+                            <div class="sub-date" id="date-gaming">--</div>
+                            <div class="st-custom">kiedy następny?</div>
+                        </div>
+                    </div>
+
+                    <div class="tile" id="tile-wyjazd" style="background-image: url('https://images.unsplash.com/photo-1506905925346-21bda4d32df4?q=80&w=400&auto=format&fit=crop');">
+                        <div class="tile-top"><div class="label" data-key="wyjazd">Wyjazd</div></div>
+                        <div class="tile-mid">
+                            <div class="counter" id="val-wyjazd">--</div>
+                            <div class="counter-sub" id="sub-val-wyjazd"></div>
+                        </div>
+                        <div class="tile-bottom">
+                            <div class="sub-date" id="date-wyjazd">--</div>
+                            <div class="st-custom">kiedy następny?</div>
+                        </div>
+                    </div>
+
+                    <div class="tile" id="tile-dafi" style="background-image: url('https://images.unsplash.com/photo-1585771724684-38269d6639fd?q=80&w=400&auto=format&fit=crop');">
+                        <div class="tile-top"><div class="label" data-key="dafi">Filtr Dafi</div></div>
+                        <div class="tile-mid"><div class="counter" id="val-dafi">--</div></div>
+                        <div class="tile-bottom">
+                            <div class="sub-date" id="date-dafi">--</div>
+                            <div class="status-box" id="msg-dafi">OK</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- EKRAN 3 – wolne sloty (aktywujesz w edytorze) -->
+        <div class="screen" id="screen-2">
+            <div class="bg-clouds" id="clouds-2"></div>
+            <div class="container">
+                <div class="title-main" onclick="toggleFullScreen()">Wolne <span class="screen-num">3/3</span></div>
+
+                <div class="grid" id="free-grid">
+                    <div class="tile tile-placeholder" id="tile-free1">
+                        <div class="tile-top"><div class="label" data-key="free1">+ wolna 1</div></div>
+                        <div class="tile-mid"><div class="counter" id="val-free1">?</div></div>
+                        <div class="tile-bottom">
+                            <div class="sub-date" id="date-free1">--</div>
+                            <div class="status-box" id="msg-free1" style="display:none">OK</div>
+                        </div>
+                    </div>
+                    <div class="tile tile-placeholder" id="tile-free2">
+                        <div class="tile-top"><div class="label" data-key="free2">+ wolna 2</div></div>
+                        <div class="tile-mid"><div class="counter" id="val-free2">?</div></div>
+                        <div class="tile-bottom">
+                            <div class="sub-date" id="date-free2">--</div>
+                            <div class="status-box" id="msg-free2" style="display:none">OK</div>
+                        </div>
+                    </div>
+                    <div class="tile tile-placeholder" id="tile-free3">
+                        <div class="tile-top"><div class="label" data-key="free3">+ wolna 3</div></div>
+                        <div class="tile-mid"><div class="counter" id="val-free3">?</div></div>
+                        <div class="tile-bottom">
+                            <div class="sub-date" id="date-free3">--</div>
+                            <div class="status-box" id="msg-free3" style="display:none">OK</div>
+                        </div>
+                    </div>
+                    <div class="tile tile-placeholder" id="tile-free4">
+                        <div class="tile-top"><div class="label" data-key="free4">+ wolna 4</div></div>
+                        <div class="tile-mid"><div class="counter" id="val-free4">?</div></div>
+                        <div class="tile-bottom">
+                            <div class="sub-date" id="date-free4">--</div>
+                            <div class="status-box" id="msg-free4" style="display:none">OK</div>
+                        </div>
+                    </div>
+                    <div class="tile tile-placeholder" id="tile-free5">
+                        <div class="tile-top"><div class="label" data-key="free5">+ wolna 5</div></div>
+                        <div class="tile-mid"><div class="counter" id="val-free5">?</div></div>
+                        <div class="tile-bottom">
+                            <div class="sub-date" id="date-free5">--</div>
+                            <div class="status-box" id="msg-free5" style="display:none">OK</div>
+                        </div>
+                    </div>
+                    <div class="tile tile-placeholder" id="tile-free6">
+                        <div class="tile-top"><div class="label" data-key="free6">+ wolna 6</div></div>
+                        <div class="tile-mid"><div class="counter" id="val-free6">?</div></div>
+                        <div class="tile-bottom">
+                            <div class="sub-date" id="date-free6">--</div>
+                            <div class="status-box" id="msg-free6" style="display:none">OK</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div><!-- end screens-wrapper -->
+
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <script>
+        // ===== SUPABASE CONFIG =====
+        const SUPABASE_URL  = 'https://tlugezigwdwdaguyjbdn.supabase.co';
+        const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRsdWdlemlnd2R3ZGFndXlqYmRuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1NDAxNjQsImV4cCI6MjA5MDExNjE2NH0.PQ_sbSxFyTOeZ7-ziXoPYYBDE4xxaSKDFVns5jrdn0g';
+        const { createClient } = supabase;
+        const db = createClient(SUPABASE_URL, SUPABASE_ANON);
+
+        // Cache lokalny – dane trzymamy w pamięci po załadowaniu
+        const taskCache = {};
+
+        // Status sync w nagłówku
+        function setSyncStatus(state) {
+            const el = document.getElementById('sync-status');
+            if (!el) return;
+            el.className = state;
+            el.textContent = state === 'ok' ? '● SYNC' : state === 'syncing' ? '↻ SYNC...' : '✕ BŁĄD';
+        }
+
+        // ===== ZAPIS DO SUPABASE =====
+        async function saveTask(key, timestamp) {
+            setSyncStatus('syncing');
+            taskCache[key] = timestamp;
+            refresh();
+
+            const { error } = await db
+                .from('tasks')
+                .upsert({ key, last_done: timestamp }, { onConflict: 'key' });
+
+            if (error) {
+                console.error('Supabase save error:', error);
+                setSyncStatus('error');
+                localStorage.setItem('task_' + key, timestamp);
+            } else {
+                setSyncStatus('ok');
+                localStorage.setItem('task_' + key, timestamp);
+            }
+        }
+
+        // ===== ODCZYT Z SUPABASE =====
+        async function loadAllTasks() {
+            setSyncStatus('syncing');
+            const { data, error } = await db.from('tasks').select('key, last_done');
+
+            if (error) {
+                console.error('Supabase load error:', error);
+                setSyncStatus('error');
+                Object.keys(config).forEach(key => {
+                    const stored = localStorage.getItem('task_' + key);
+                    if (stored) taskCache[key] = parseInt(stored);
+                });
+            } else {
+                setSyncStatus('ok');
+                data.forEach(row => {
+                    taskCache[row.key] = row.last_done;
+                    localStorage.setItem('task_' + row.key, row.last_done);
+                });
+            }
+            // Równolegle konfiguracja kafelków (nazwy, tła, wolne sloty)
+            await loadTileOverridesFromCloud();
+            refresh();
+        }
+
+        // ===== REALTIME =====
+        db.channel('tasks-changes')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, payload => {
+                const { key, last_done } = payload.new || {};
+                if (key && last_done) {
+                    taskCache[key] = last_done;
+                    localStorage.setItem('task_' + key, last_done);
+                    refresh();
+                }
+            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, payload => {
+                if (payload.new && payload.new.key === 'tileOverrides' && payload.new.value) {
+                    try {
+                        applyTileOverrides(JSON.parse(payload.new.value));
+                        console.log('[realtime] tileOverrides zaktualizowane z innego urządzenia');
+                    } catch (e) {}
+                }
+            })
+            .subscribe();
+
+        // ===== KEEP-ALIVE – zapobiega pauzowaniu free tier =====
+        async function pingKeepAlive(showAlert = false) {
+            try {
+                const { error } = await db.from('tasks').select('key').limit(1);
+                if (error) throw error;
+                if (showAlert) alert('Ping OK – baza jest aktywna');
+                console.log('[keep-alive] OK', new Date().toLocaleTimeString());
+            } catch (e) {
+                console.warn('[keep-alive] failed', e);
+                if (showAlert) alert('Ping nieudany – baza może być niedostępna');
+            }
+        }
+
+        // ===== KONFIGURACJA ZADAŃ (bazowa) =====
+        // free1–free6 = sloty na 3. ekranie (domyślnie wyłączone, aktywujesz w edytorze)
+        const defaultConfig = {
+            kuweta:  { limit: 6,  msg: "WYMIEŃ", logic: true,  q: "Opróżniłeś kuwetę?", label: "Kuweta", enabled: true },
+            liquid:  { limit: 20, msg: "KUP!",   logic: true,  q: "Dolałeś liquid?", label: "Liquid", enabled: true },
+            floor:   { limit: 14, msg: "MYCIE",  logic: true,  q: "Umyłeś podłogę?", label: "Podłoga", enabled: true },
+            gaz:     { limit: 60, msg: "BUTLA",  logic: true,  q: "Wymieniłeś butlę z gazem?", label: "Gaz", enabled: true },
+            kino:    { logic: false, q: "Byłeś w kinie?", label: "Kino", enabled: true },
+            las:     { logic: false, q: "Byłeś na plenerze?", showMonths: true, label: "Plener z aparatem", enabled: true },
+            spacer:  { logic: false, q: "Byliście razem na spacerze?", showMonths: true, label: "Wspólny spacer", enabled: true },
+            soda:    { limit: 30, msg: "WYMIEŃ", logic: true,  q: "Wymieniliście butlę Soda Stream?", label: "Soda Stream", enabled: true },
+            resto:   { logic: false, q: "Byliście razem w restauracji?", showMonths: true, label: "Restauracja", enabled: true },
+            gaming:  { logic: false, q: "Graliście razem?", label: "Gaming", enabled: true },
+            wyjazd:  { logic: false, q: "Byliście razem na wyjeździe?", showMonths: true, label: "Wyjazd", enabled: true },
+            dafi:    { limit: 30, msg: "WYMIEŃ", logic: true, q: "Wymieniłeś filtr Dafi?", label: "Filtr Dafi", enabled: true },
+            free1:   { logic: false, q: "Zadanie wykonane?", label: "+ wolna 1", enabled: false },
+            free2:   { logic: false, q: "Zadanie wykonane?", label: "+ wolna 2", enabled: false },
+            free3:   { logic: false, q: "Zadanie wykonane?", label: "+ wolna 3", enabled: false },
+            free4:   { logic: false, q: "Zadanie wykonane?", label: "+ wolna 4", enabled: false },
+            free5:   { logic: false, q: "Zadanie wykonane?", label: "+ wolna 5", enabled: false },
+            free6:   { logic: false, q: "Zadanie wykonane?", label: "+ wolna 6", enabled: false },
+        };
+
+        let config = JSON.parse(JSON.stringify(defaultConfig));
+
+        // Zastosuj nadpisania (z localStorage lub z chmury)
+        function applyTileOverrides(overrides) {
+            if (!overrides || typeof overrides !== 'object') return;
+            config = JSON.parse(JSON.stringify(defaultConfig));
+            Object.keys(overrides).forEach(key => {
+                if (config[key]) Object.assign(config[key], overrides[key]);
+            });
+            localStorage.setItem('tileOverrides', JSON.stringify(overrides));
+            // Podłącz kliknięcia dla aktywnych free slotów
+            Object.keys(config).forEach(key => {
+                const el = document.getElementById('tile-' + key);
+                if (!el) return;
+                if (config[key].enabled !== false) {
+                    el.onclick = () => openPopup(key);
+                } else {
+                    el.onclick = null;
+                }
+            });
+            refresh();
+        }
+
+        // Lokalny start (potem nadpisze chmura jeśli jest)
+        try {
+            const savedOverrides = localStorage.getItem('tileOverrides');
+            if (savedOverrides) applyTileOverrides(JSON.parse(savedOverrides));
+        } catch (e) {}
+
+        // ===== SYNC KONFIGURACJI KAFELKÓW (app_settings) =====
+        async function loadTileOverridesFromCloud() {
+            try {
+                const { data, error } = await db
+                    .from('app_settings')
+                    .select('value')
+                    .eq('key', 'tileOverrides')
+                    .maybeSingle();
+                if (error) {
+                    // Tabela może jeszcze nie istnieć – to OK, zostaje localStorage
+                    console.warn('[tile-config] load:', error.message);
+                    return;
+                }
+                if (data && data.value) {
+                    const overrides = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
+                    applyTileOverrides(overrides);
+                    console.log('[tile-config] załadowano z chmury');
+                }
+            } catch (e) {
+                console.warn('[tile-config] load exception', e);
+            }
+        }
+
+        async function saveTileOverridesToCloud(overrides) {
+            localStorage.setItem('tileOverrides', JSON.stringify(overrides));
+            try {
+                const { error } = await db
+                    .from('app_settings')
+                    .upsert(
+                        { key: 'tileOverrides', value: JSON.stringify(overrides), updated_at: new Date().toISOString() },
+                        { onConflict: 'key' }
+                    );
+                if (error) {
+                    console.warn('[tile-config] save failed (czy tabela app_settings istnieje?):', error.message);
+                    return false;
+                }
+                console.log('[tile-config] zapisano do chmury');
+                return true;
+            } catch (e) {
+                console.warn('[tile-config] save exception', e);
+                return false;
+            }
+        }
+
+        let activeKey = null;
+        const daysNames   = ["Niedziela","Poniedziałek","Wtorek","Środa","Czwartek","Piątek","Sobota"];
+        const monthsNames = ["Stycznia","Lutego","Marca","Kwietnia","Maja","Czerwca","Lipca","Sierpnia","Września","Października","Listopada","Grudnia"];
+
+        // ===== NAWIGACJA =====
+        let currentScreen = 0;
+        const totalScreens = 3;
+        const wrapper = document.getElementById('screens-wrapper');
+
+        function goToScreen(index) {
+            if (index < 0 || index >= totalScreens) return;
+            currentScreen = index;
+            wrapper.style.transform = `translateX(-${currentScreen * 100}vw)`;
+            document.querySelectorAll('.dot').forEach((dot, i) => {
+                dot.classList.toggle('active', i === currentScreen);
+            });
+        }
+
+        // ===== SWIPE / TOUCH =====
+        let touchStartX = 0, touchStartY = 0, touchStartTime = 0, isDragging = false;
+
+        document.addEventListener('touchstart', e => {
+            if (document.getElementById('popup-overlay').style.display === 'flex') return;
+            if (document.getElementById('tools-overlay').style.display === 'flex') return;
+            if (document.getElementById('editor-overlay').style.display === 'flex') return;
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+            touchStartTime = Date.now();
+            isDragging = true;
+            wrapper.style.transition = 'none';
+        }, { passive: true });
+
+        document.addEventListener('touchmove', e => {
+            if (!isDragging) return;
+            const dx = e.touches[0].clientX - touchStartX;
+            const baseOffset = currentScreen * 100;
+            wrapper.style.transform = `translateX(calc(-${baseOffset}vw + ${dx}px))`;
+        }, { passive: true });
+
+        document.addEventListener('touchend', e => {
+            if (!isDragging) return;
+            isDragging = false;
+            const dx = e.changedTouches[0].clientX - touchStartX;
+            const dy = e.changedTouches[0].clientY - touchStartY;
+            const dt = Date.now() - touchStartTime;
+            wrapper.style.transition = 'transform 0.45s cubic-bezier(0.4, 0, 0.2, 1)';
+            const isHorizontal = Math.abs(dx) > Math.abs(dy);
+            const isFastSwipe = dt < 350 && Math.abs(dx) > 40;
+            const isBigSwipe = Math.abs(dx) > window.innerWidth * 0.25;
+            if (isHorizontal && (isFastSwipe || isBigSwipe)) {
+                if (dx < 0) goToScreen(currentScreen + 1);
+                else goToScreen(currentScreen - 1);
+            } else {
+                goToScreen(currentScreen);
+            }
+        }, { passive: true });
+
+        // ===== MYSZ =====
+        let mouseStartX = 0, mouseDown = false;
+
+        document.addEventListener('mousedown', e => {
+            if (document.getElementById('popup-overlay').style.display === 'flex') return;
+            mouseStartX = e.clientX; mouseDown = true;
+            wrapper.style.transition = 'none';
+        });
+        document.addEventListener('mousemove', e => {
+            if (!mouseDown) return;
+            const dx = e.clientX - mouseStartX;
+            wrapper.style.transform = `translateX(calc(-${currentScreen * 100}vw + ${dx}px))`;
+        });
+        document.addEventListener('mouseup', e => {
+            if (!mouseDown) return;
+            mouseDown = false;
+            const dx = e.clientX - mouseStartX;
+            wrapper.style.transition = 'transform 0.45s cubic-bezier(0.4, 0, 0.2, 1)';
+            if (Math.abs(dx) > window.innerWidth * 0.2) {
+                if (dx < 0) goToScreen(currentScreen + 1);
+                else goToScreen(currentScreen - 1);
+            } else {
+                goToScreen(currentScreen);
+            }
+        });
+
+        document.addEventListener('keydown', e => {
+            if (e.key === 'ArrowRight' || e.key === 'ArrowDown') goToScreen(currentScreen + 1);
+            if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   goToScreen(currentScreen - 1);
+        });
+
+        function toggleFullScreen() {
+            if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+            else if (document.exitFullscreen) document.exitFullscreen();
+        }
+
+        // ===== POPUP =====
+        function openPopup(key) {
+            activeKey = key;
+            document.getElementById('popup-text').innerText = config[key].q;
+            document.getElementById('main-btns').style.display = 'flex';
+            document.getElementById('manual-date-container').style.display = 'none';
+            document.getElementById('popup-overlay').style.display = 'flex';
+        }
+
+        function closePopup() {
+            document.getElementById('popup-overlay').style.display = 'none';
+            activeKey = null;
+        }
+
+        document.getElementById('btn-confirm').onclick = () => {
+            saveTask(activeKey, new Date().getTime());
+            closePopup();
+        };
+
+        document.getElementById('btn-cancel').onclick = closePopup;
+
+        document.getElementById('btn-manual-trigger').onclick = () => {
+            document.getElementById('main-btns').style.display = 'none';
+            document.getElementById('manual-date-container').style.display = 'flex';
+            document.getElementById('calendar-input').value = new Date().toISOString().split('T')[0];
+        };
+
+        document.getElementById('btn-back').onclick = () => {
+            document.getElementById('main-btns').style.display = 'flex';
+            document.getElementById('manual-date-container').style.display = 'none';
+        };
+
+        document.getElementById('btn-save-manual').onclick = () => {
+            const dateVal = document.getElementById('calendar-input').value;
+            if (dateVal) {
+                saveTask(activeKey, new Date(dateVal).getTime());
+                closePopup();
+            }
+        };
+
+        // ===== REFRESH UI =====
+        function refresh() {
+            Object.keys(config).forEach(key => {
+                const stored  = taskCache[key];
+                const tileEl  = document.getElementById(`tile-${key}`);
+                const valEl   = document.getElementById(`val-${key}`);
+                const dateEl  = document.getElementById(`date-${key}`);
+                const msgEl   = document.getElementById(`msg-${key}`);
+                if (!tileEl || !valEl) return;
+
+                const isFree = key.startsWith('free');
+                const isEnabled = config[key].enabled !== false;
+
+                // Placeholder vs aktywny kafelek (dla free*)
+                if (isFree) {
+                    if (isEnabled) {
+                        tileEl.classList.remove('tile-placeholder');
+                        tileEl.style.opacity = '1';
+                        tileEl.style.pointerEvents = 'auto';
+                        if (msgEl) msgEl.style.display = config[key].logic ? '' : 'none';
+                    } else {
+                        tileEl.classList.add('tile-placeholder');
+                        tileEl.style.backgroundImage = '';
+                        tileEl.style.opacity = '';
+                        tileEl.style.pointerEvents = 'none';
+                        valEl.innerHTML = '?';
+                        valEl.style.fontSize = '40px';
+                        valEl.style.opacity = '0.15';
+                        if (dateEl) dateEl.innerHTML = '--';
+                        if (msgEl) msgEl.style.display = 'none';
+                        tileEl.classList.remove('needs-attention', 'overdue');
+                        const labelEl = tileEl.querySelector('.label');
+                        if (labelEl) {
+                            labelEl.textContent = config[key].label || ('+ wolna ' + key.replace('free',''));
+                            labelEl.style.opacity = '0.25';
+                        }
+                        return; // nie liczymy dni dla wyłączonych
+                    }
+                }
+
+                // Zastosuj label i tło z config (po edycji)
+                const labelEl = tileEl.querySelector('.label');
+                if (labelEl && config[key].label) {
+                    labelEl.textContent = config[key].label;
+                    labelEl.style.opacity = '';
+                }
+                if (config[key].bg) {
+                    tileEl.style.backgroundImage = `url('${config[key].bg}')`;
+                }
+
+                if (stored) {
+                    const lastDate = new Date(parseInt(stored));
+                    const nowLocal   = new Date();
+                    const y1 = nowLocal.getFullYear(), m1 = nowLocal.getMonth(), d1 = nowLocal.getDate();
+                    const y2 = lastDate.getFullYear(), m2 = lastDate.getMonth(), d2 = lastDate.getDate();
+                    const todayClean = new Date(y1, m1, d1);
+                    const lastClean  = new Date(y2, m2, d2);
+                    const diffDays   = Math.round((todayClean - lastClean) / 86400000);
+
+                    valEl.style.fontSize = '';
+                    valEl.style.opacity = '';
+                    valEl.innerHTML = diffDays === 0 ? "DZIŚ" : `${diffDays}<small>dni</small>`;
+
+                    const subValEl = document.getElementById(`sub-val-${key}`);
+                    if (subValEl) {
+                        if (config[key].showMonths && diffDays > 30) {
+                            const m = Math.floor(diffDays / 30.44);
+                            const d = Math.floor(diffDays % 30.44);
+                            subValEl.innerHTML = `${m}m ${d}dni`;
+                        } else {
+                            subValEl.innerHTML = "";
+                        }
+                    }
+
+                    if (dateEl) dateEl.innerHTML = `${daysNames[lastDate.getDay()]}<br>${lastDate.getDate()} ${monthsNames[lastDate.getMonth()]}`;
+
+                    if (config[key].logic && msgEl) {
+                        const limit = config[key].limit || 14;
+                        tileEl.classList.remove('needs-attention', 'overdue');
+                        msgEl.style.display = '';
+                        if (diffDays >= limit * 0.7) {
+                            if (diffDays >= limit) {
+                                tileEl.classList.add('overdue');
+                                msgEl.innerText = config[key].msg || "TERMIN";
+                                msgEl.style.background = 'var(--warn-orange)';
+                                msgEl.style.color = '#fff';
+                                msgEl.classList.add('st-warn');
+                            } else {
+                                tileEl.classList.add('needs-attention');
+                                msgEl.innerText = "TERMIN";
+                                msgEl.style.borderColor = 'var(--warn-orange)';
+                                msgEl.style.color = 'var(--warn-orange)';
+                                msgEl.style.background = 'rgba(0,0,0,0.7)';
+                            }
+                        } else {
+                            msgEl.innerText = "OK";
+                            msgEl.style.borderColor = 'var(--warn-orange)';
+                            msgEl.style.color = 'var(--warn-orange)';
+                            msgEl.style.background = 'rgba(0,0,0,0.7)';
+                            msgEl.classList.remove('st-warn');
+                        }
+                    } else {
+                        tileEl.classList.remove('needs-attention', 'overdue');
+                        if (msgEl) msgEl.style.display = 'none';
+                    }
+                } else if (isEnabled) {
+                    // Aktywny kafelek bez daty – pokaż placeholder wartości
+                    valEl.style.fontSize = '';
+                    valEl.style.opacity = '';
+                    valEl.innerHTML = '--';
+                    if (dateEl) dateEl.innerHTML = '--';
+                }
+            });
+        }
+
+        // ===== EKSPORT / IMPORT =====
+        function exportTasks() {
+            const data = {
+                exportedAt: new Date().toISOString(),
+                version: APP_VERSION,
+                tasks: { ...taskCache },
+                tileOverrides: JSON.parse(localStorage.getItem('tileOverrides') || '{}')
+            };
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `terminarz-backup-${new Date().toISOString().slice(0,10)}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            closeTools();
+        }
+
+        function importTasks(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    if (data.tasks) {
+                        for (const [key, ts] of Object.entries(data.tasks)) {
+                            taskCache[key] = ts;
+                            localStorage.setItem('task_' + key, ts);
+                            // Zapisz też do Supabase
+                            await saveTask(key, ts);
+                        }
+                    }
+                    if (data.tileOverrides) {
+                        localStorage.setItem('tileOverrides', JSON.stringify(data.tileOverrides));
+                        // Przeładuj config
+                        config = JSON.parse(JSON.stringify(defaultConfig));
+                        Object.keys(data.tileOverrides).forEach(key => {
+                            if (config[key]) Object.assign(config[key], data.tileOverrides[key]);
+                        });
+                    }
+                    refresh();
+                    alert('Import zakończony pomyślnie');
+                } catch (err) {
+                    alert('Błąd importu: ' + err.message);
+                }
+                event.target.value = '';
+                closeTools();
+            };
+            reader.readAsText(file);
+        }
+
+        // ===== EDYTOR KAFELKÓW =====
+        function openTools() {
+            document.getElementById('tools-overlay').style.display = 'flex';
+        }
+        function closeTools() {
+            document.getElementById('tools-overlay').style.display = 'none';
+        }
+
+        function openTileEditorList() {
+            closeTools();
+            const content = document.getElementById('editor-content');
+            document.getElementById('editor-title').textContent = 'Edytor kafelków';
+
+            const mainKeys = Object.keys(config).filter(k => !k.startsWith('free'));
+            const freeKeys = Object.keys(config).filter(k => k.startsWith('free'));
+
+            let html = '<div style="font-size:11px;opacity:0.6;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px">Główne kafelki</div>';
+            html += mainKeys.map(key => `
+                <div class="tile-list-item" onclick="openTileForm('${key}')">
+                    <span>${config[key].label || key}</span>
+                    <span style="opacity:0.5;font-size:12px">${key}</span>
+                </div>
+            `).join('');
+
+            html += '<div style="font-size:11px;opacity:0.6;margin:16px 0 8px;text-transform:uppercase;letter-spacing:1px">Wolne sloty (ekran 3/3)</div>';
+            html += freeKeys.map(key => {
+                const on = config[key].enabled;
+                return `
+                <div class="tile-list-item" onclick="openTileForm('${key}')" style="${on ? '' : 'opacity:0.55'}">
+                    <span>${config[key].label || key} ${on ? '' : '(wyłączony)'}</span>
+                    <span style="opacity:0.5;font-size:12px">${on ? '● aktywny' : '○ wolny'}</span>
+                </div>`;
+            }).join('');
+
+            content.innerHTML = html;
+            document.getElementById('editor-overlay').style.display = 'flex';
+        }
+
+        function openTileForm(key) {
+            const c = config[key];
+            const isFree = key.startsWith('free');
+            document.getElementById('editor-title').textContent = 'Edycja: ' + (c.label || key);
+            document.getElementById('editor-content').innerHTML = `
+                <div class="editor-form">
+                    ${isFree ? `
+                    <div class="row-check" style="margin-bottom:12px;padding:10px;border:1px solid var(--neon-green);border-radius:10px">
+                        <input type="checkbox" id="ed-enabled" ${c.enabled ? 'checked' : ''}>
+                        <label for="ed-enabled" style="margin:0;font-weight:800">AKTYWUJ ten slot</label>
+                    </div>
+                    ` : ''}
+
+                    <label>Nazwa (label)</label>
+                    <input type="text" id="ed-label" value="${(c.label || '').replace(/"/g, '&quot;')}">
+
+                    <label>Pytanie w popupie</label>
+                    <input type="text" id="ed-q" value="${(c.q || '').replace(/"/g, '&quot;')}">
+
+                    <label>URL tła (obrazek)</label>
+                    <input type="url" id="ed-bg" value="${(c.bg || '').replace(/"/g, '&quot;')}" placeholder="https://...">
+
+                    <label>Limit dni (tylko dla zadań z logiką)</label>
+                    <input type="number" id="ed-limit" value="${c.limit || ''}" min="1" placeholder="np. 14">
+
+                    <label>Tekst alertu (gdy przekroczony limit)</label>
+                    <input type="text" id="ed-msg" value="${(c.msg || '').replace(/"/g, '&quot;')}" placeholder="np. WYMIEŃ">
+
+                    <div class="row-check">
+                        <input type="checkbox" id="ed-logic" ${c.logic ? 'checked' : ''}>
+                        <label for="ed-logic" style="margin:0">Cykl / limit (alert gdy minie X dni)</label>
+                    </div>
+                    <div style="font-size:11px;opacity:0.55;margin:2px 0 8px 26px">Wyłącz = zwykły licznik od ostatniej daty</div>
+                    <div class="row-check">
+                        <input type="checkbox" id="ed-months" ${c.showMonths ? 'checked' : ''}>
+                        <label for="ed-months" style="margin:0">Pokazuj miesiące przy długim czasie</label>
+                    </div>
+
+                    <button class="btn btn-yes" style="margin-top:18px;width:100%" onclick="saveTileForm('${key}')">ZAPISZ</button>
+                    <button class="btn btn-no" style="margin-top:8px;width:100%" onclick="openTileEditorList()">WRÓĆ DO LISTY</button>
+                </div>
+            `;
+        }
+
+        function saveTileForm(key) {
+            const overrides = JSON.parse(localStorage.getItem('tileOverrides') || '{}');
+            if (!overrides[key]) overrides[key] = {};
+
+            const label = document.getElementById('ed-label').value.trim();
+            const q = document.getElementById('ed-q').value.trim();
+            const bg = document.getElementById('ed-bg').value.trim();
+            const limit = parseInt(document.getElementById('ed-limit').value);
+            const msg = document.getElementById('ed-msg').value.trim();
+            const logic = document.getElementById('ed-logic').checked;
+            const showMonths = document.getElementById('ed-months').checked;
+            const enabledEl = document.getElementById('ed-enabled');
+            const enabled = enabledEl ? enabledEl.checked : true;
+
+            if (label) { overrides[key].label = label; config[key].label = label; }
+            if (q) { overrides[key].q = q; config[key].q = q; }
+            if (bg) { overrides[key].bg = bg; config[key].bg = bg; }
+            else { delete overrides[key].bg; delete config[key].bg; }
+
+            if (logic) {
+                overrides[key].logic = true;
+                config[key].logic = true;
+                if (!isNaN(limit) && limit > 0) {
+                    overrides[key].limit = limit;
+                    config[key].limit = limit;
+                }
+                if (msg) {
+                    overrides[key].msg = msg;
+                    config[key].msg = msg;
+                }
+            } else {
+                overrides[key].logic = false;
+                config[key].logic = false;
+            }
+
+            overrides[key].showMonths = showMonths;
+            config[key].showMonths = showMonths;
+
+            overrides[key].enabled = enabled;
+            config[key].enabled = enabled;
+
+            // Zapisz lokalnie + do chmury (żeby inne urządzenia widziały zmiany)
+            saveTileOverridesToCloud(overrides).then(ok => {
+                applyTileOverrides(overrides);
+                alert(
+                    'Zapisano: ' + (config[key].label || key) + (enabled ? ' (aktywny)' : ' (wyłączony)') +
+                    (ok ? '\n✓ Zsynchronizowano z bazą' : '\n⚠ Tylko lokalnie – uruchom SQL z changelogu (tabela app_settings)')
+                );
+                openTileEditorList();
+            });
+        }
+
+        function closeEditor() {
+            document.getElementById('editor-overlay').style.display = 'none';
+        }
+
+        // ===== WERSJONOWANIE =====
+        const APP_VERSION = '1.5.0';
+        const CHANGELOG = [
+            { v: '1.5.0', d: '2026-09-17', items: [
+                'Synchronizacja konfiguracji kafelków między urządzeniami (tabela app_settings)',
+                'Aktywacja wolnych slotów, nazwy, tła i limity widoczne na wszystkich urządzeniach',
+                'Realtime: zmiany w edytorze od razu na drugim telefonie',
+                'WYMAGANE raz w Supabase SQL Editor: CREATE TABLE app_settings (key text primary key, value text not null, updated_at timestamptz default now()); ALTER TABLE app_settings ENABLE ROW LEVEL SECURITY; CREATE POLICY "anon all" ON app_settings FOR ALL TO anon USING (true) WITH CHECK (true);'
+            ]},
+            { v: '1.4.3', d: '2026-09-17', items: [
+                'Przyciski v / 🎨 / ⚙️ w linii nagłówka zaraz za SYNC (większe, czytelniejsze)',
+                'W edytorze jaśniejszy opis: cykl/limit vs zwykły licznik od daty'
+            ]},
+            { v: '1.4.2', d: '2026-09-17', items: [
+                'Przeniesiono badge wersji, motyw i narzędzia na lewą stronę (nie zasłaniają się z innymi UI)'
+            ]},
+            { v: '1.4.1', d: '2026-09-17', items: [
+                'Wolne sloty na ekranie 3/3: można je aktywować i konfigurować w edytorze',
+                '6 gotowych pozycji (free1–free6) – wystarczy włączyć i nadać nazwę/tło'
+            ]},
+            { v: '1.4.0', d: '2026-09-17', items: [
+                'Keep-alive: automatyczny ping bazy co 4h (zapobiega pauzowaniu free tier)',
+                'Eksport / import danych do pliku JSON (backup + przywracanie)',
+                'Edytor kafelków: zmiana nazwy, pytania, tła, limitu dni i logiki',
+                'Przycisk narzędzi (⚙️) obok motywów'
+            ]},
+            { v: '1.3.0', d: '2026-08-01', items: [
+                'Dodano kafelek "Filtr Dafi" (ekran 2/3)',
+                'Dodano ekran 3/3 z wolnymi pozycjami na przyszłe zadania',
+                'Dodano numer wersji + modal historii zmian',
+                'Dodano 4 motywy kolorystyczne (2 jasne + 2 ciemne) i własny kolor akcentu'
+            ]},
+            { v: '1.2.0', d: '2026-07-15', items: [
+                'Poprawki synchronizacji z Supabase',
+                'Ulepszony wskaźnik statusu SYNC'
+            ]},
+            { v: '1.0.0', d: '2026-06-01', items: [
+                'Pierwsza wersja Terminarza z 2 ekranami'
+            ]},
+        ];
+
+        function renderVersionBadge() {
+            document.getElementById('version-badge').textContent = 'v' + APP_VERSION;
+        }
+
+        function openChangelog() {
+            const list = document.getElementById('changelog-list');
+            list.innerHTML = CHANGELOG.map(entry => `
+                <div class="changelog-entry">
+                    <span class="cv">v${entry.v}</span><span class="cd">${entry.d}</span>
+                    <ul>${entry.items.map(i => `<li>${i}</li>`).join('')}</ul>
+                </div>
+            `).join('');
+            document.getElementById('changelog-overlay').style.display = 'flex';
+        }
+        function closeChangelog() {
+            document.getElementById('changelog-overlay').style.display = 'none';
+        }
+
+        // ===== MOTYWY (4 gotowe + własny akcent) =====
+        const THEMES = [
+            { id: 'dark-neon',   name: 'Ciemny Neon',  swatch: '#39ff14', bg: '#000' },
+            { id: 'dark-cyan',   name: 'Ciemny Cyan',  swatch: '#14e6ff', bg: '#060912' },
+            { id: 'light-mint',  name: 'Jasny Mięta',  swatch: '#12b76a', bg: '#f4faf7' },
+            { id: 'light-coral', name: 'Jasny Koral',  swatch: '#ff5c5c', bg: '#fff6f5' },
+        ];
+
+        function applyTheme(themeId) {
+            document.documentElement.setAttribute('data-theme', themeId);
+            localStorage.setItem('app_theme', themeId);
+            renderThemeGrid();
+        }
+
+        function renderThemeGrid() {
+            const current = localStorage.getItem('app_theme') || 'dark-neon';
+            const grid = document.getElementById('theme-grid');
+            grid.innerHTML = THEMES.map(t => `
+                <div class="theme-swatch ${t.id === current ? 'active' : ''}" onclick="applyTheme('${t.id}')">
+                    <div class="dot-preview" style="background:${t.swatch}; border:2px solid ${t.bg}; box-shadow:0 0 8px ${t.swatch}"></div>
+                    ${t.name}
+                </div>
+            `).join('');
+        }
+
+        function applyCustomAccent(hex) {
+            document.documentElement.style.setProperty('--custom-accent', hex);
+            document.documentElement.style.setProperty('--custom-accent-light', hex);
+            document.documentElement.setAttribute('data-custom-accent', '1');
+            localStorage.setItem('customAccent', hex);
+        }
+
+        function resetAccent() {
+            document.documentElement.removeAttribute('data-custom-accent');
+            localStorage.removeItem('customAccent');
+        }
+
+        function openThemePicker() {
+            renderThemeGrid();
+            document.getElementById('theme-overlay').style.display = 'flex';
+        }
+        function closeThemePicker() {
+            document.getElementById('theme-overlay').style.display = 'none';
+        }
+
+        document.getElementById('accent-picker').addEventListener('input', e => applyCustomAccent(e.target.value));
+
+        function initThemeFromStorage() {
+            const savedTheme = localStorage.getItem('app_theme') || 'dark-neon';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            const savedAccent = localStorage.getItem('customAccent');
+            if (savedAccent) {
+                applyCustomAccent(savedAccent);
+                document.getElementById('accent-picker').value = savedAccent;
+            }
+        }
+
+        // ===== INIT =====
+        function init() {
+            renderVersionBadge();
+            initThemeFromStorage();
+            Object.keys(config).forEach(key => {
+                const el = document.getElementById(`tile-${key}`);
+                if (el && config[key].enabled !== false) {
+                    el.addEventListener('click', () => openPopup(key));
+                }
+            });
+
+            ['clouds-0','clouds-1','clouds-2'].forEach(id => {
+                const container = document.getElementById(id);
+                if (!container) return;
+                for (let i = 0; i < 5; i++) {
+                    const c = document.createElement('div');
+                    c.className = 'cloud';
+                    c.style.cssText = `width:300px;height:150px;top:${Math.random()*35}%;left:${Math.random()*80}%`;
+                    container.appendChild(c);
+                }
+            });
+
+            loadAllTasks();
+            refresh(); // od razu pokaż stan free slotów
+
+            // Keep-alive co 4 godziny
+            setInterval(() => pingKeepAlive(false), 4 * 60 * 60 * 1000);
+            // Pierwszy ping po 30 sekundach
+            setTimeout(() => pingKeepAlive(false), 30000);
+        }
+
+        init();
+        setInterval(loadAllTasks, 60000);   // odśwież z bazy co minutę
+        setTimeout(() => location.reload(), 7200000); // reload co 2h
+    </script>
+</body>
+</html>

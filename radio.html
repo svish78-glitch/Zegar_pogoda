@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <title>Radio TWIX v79.0 - Precision Dynamic Audio</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@800&family=Montserrat:wght@300;400;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --accent: #FFD700;
+            --neon: #39ff14;
+            --glass-bg: rgba(60, 0, 30, 0.65);
+            --led-gap: 2px;
+            --led-height: 5px;
+        }
+        * { box-sizing: border-box; }
+        body, html { 
+            margin: 0; padding: 0; height: 100vh; width: 100vw;
+            overflow: hidden; font-family: 'Montserrat', sans-serif; color: #fff;
+            display: flex; justify-content: center; align-items: center;
+            background: #000;
+        }
+
+        .bg-image {
+            position: fixed; inset: 0; z-index: -2;
+            background: linear-gradient(rgba(0,0,0,0.8), rgba(0,0,0,0.8)), 
+                        url('https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&q=80&w=1920') no-repeat center center/cover;
+        }
+        canvas#weather-canvas { position: fixed; inset: 0; z-index: -1; pointer-events: none; }
+
+        #now-playing-overlay {
+            position: fixed; inset: 0; z-index: 9999999;
+            background: rgba(0, 0, 0, 0.96);
+            display: none; flex-direction: column; justify-content: center;
+            align-items: center; text-align: center;
+            backdrop-filter: blur(40px); pointer-events: none;
+        }
+        #now-playing-overlay.active { display: flex; animation: fadeInOverlay 0.6s ease forwards; }
+        #now-playing-overlay.fade-out { animation: fadeOutOverlay 0.6s ease forwards; }
+
+        .overlay-now-text { font-size: clamp(1rem, 5vh, 2.5rem); font-weight: 300; letter-spacing: 20px; color: #fff; margin-bottom: 20px; text-transform: uppercase; opacity: 0.6; }
+        .overlay-station-name { 
+            font-size: clamp(3rem, 15vh, 8.5rem); font-weight: 900; color: var(--accent); 
+            text-shadow: 0 0 80px rgba(255, 215, 0, 0.9); 
+            text-transform: uppercase;
+            animation: letterPower 3s infinite alternate ease-in-out;
+            line-height: 1;
+        }
+
+        @keyframes letterPower {
+            0% { letter-spacing: -5px; transform: scale(1); filter: brightness(1); }
+            50% { letter-spacing: 15px; transform: scale(1.05) skewX(-2deg); filter: brightness(1.4); }
+            100% { letter-spacing: 0px; transform: scale(1.02); filter: brightness(1.2); }
+        }
+        @keyframes fadeInOverlay { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes fadeOutOverlay { from { opacity: 1; } to { opacity: 0; } }
+
+        .outer-container {
+            position: relative; z-index: 100; width: 97%; max-width: 1400px; height: 95vh;
+            background: rgba(255,255,255,0.05); border-radius: 20px;
+            padding: 2px; overflow: hidden; border: 1px solid rgba(255,215,0,0.25);
+            box-shadow: 0 0 80px rgba(0,0,0,0.8);
+            transition: transform 0.8s cubic-bezier(0.85, 0, 0.15, 1), opacity 0.8s ease;
+        }
+        body.fs-active .outer-container { opacity: 0; transform: scale(1.1); filter: blur(25px); pointer-events: none; }
+
+        .beam {
+            position: absolute; width: 250px; height: 3px;
+            background: linear-gradient(90deg, transparent, var(--accent), transparent);
+            filter: blur(2px) drop-shadow(0 0 15px var(--accent));
+            offset-path: rect(0% 100% 100% 0% round 20px);
+            animation: moveBeam 4s linear infinite;
+        }
+        @keyframes moveBeam { 0% { offset-distance: 0%; } 100% { offset-distance: 100%; } }
+
+        .glass-panel {
+            position: relative; z-index: 2; width: 100%; height: 100%;
+            display: flex; border-radius: 18px; background: var(--glass-bg);
+            backdrop-filter: blur(40px);
+        }
+
+        .side-l { flex: 1.1; border-right: 1px solid rgba(255,215,0,0.15); padding: 5px 30px; display: flex; flex-direction: column; justify-content: flex-start; height: 100%; min-width: 0; }
+        .side-r { flex: 0.9; padding: 15px 30px; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end; text-align: right; height: 100%; min-width: 0; }
+
+        #top-content { margin-top: 0; padding-top: 5px; }
+        #time { font-family: 'JetBrains Mono', monospace; font-size: clamp(5rem, 11vw, 10rem); font-weight: 900; color: var(--accent); line-height: 0.8; letter-spacing: -6px; text-shadow: 0 0 30px rgba(255, 215, 0, 0.4); }
+        .dots { animation: pulse 2s infinite; display: inline-block; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
+
+        #date { margin: 20px 0 10px 0; text-transform: uppercase; letter-spacing: 2px; text-align: left; }
+        .day-name { font-size: 1.3rem; color: #eee; font-weight: 700; }
+        .day-num { font-size: 2rem; font-weight: 900; color: #fff; margin: 0 5px; }
+        .month-name { font-size: 1.2rem; opacity: 0.8; }
+        
+        #names { font-size: 1rem; color: var(--neon); font-weight: 700; margin-top: 5px; display: block; letter-spacing: 1px; text-align: left; }
+
+        #user-greeting { margin-top: 20px; padding: 12px 15px; border-left: 4px solid var(--neon); background: rgba(0, 0, 0, 0.5); border-radius: 0 10px 10px 0; cursor: pointer; width: 100%; max-width: 450px; }
+        #welcome-text { font-size: 0.9rem; font-weight: 900; color: var(--accent); display: block; text-transform: uppercase; margin-bottom: 4px; }
+        #motivation-text { font-size: 0.75rem; color: #fff; opacity: 0.8; font-style: italic; line-height: 1.3; display: block; min-height: 2em; transition: opacity 0.5s; }
+
+        .weather-container { background: rgba(0,0,0,0.4); padding: 12px; border-radius: 12px; border-left: 6px solid var(--accent); width: 100%; text-align: left; margin-top: 20px; }
+        #temp { font-family: 'JetBrains Mono', monospace; font-size: 2.2rem; font-weight: 900; }
+        #w-icon { font-size: 2.5rem; display: inline-block; animation: floatIcon 3s ease-in-out infinite; }
+
+        .ticker { 
+            width: 100%; background: #000; border-radius: 15px; 
+            overflow: hidden; white-space: nowrap; border: 3px solid var(--accent); 
+            margin-top: auto; margin-bottom: 15px; height: 100px; display: flex; align-items: center; 
+            cursor: pointer; position: relative;
+        }
+        #news-container { 
+            display: inline-block; 
+            padding-left: 100%; 
+            font-size: 1.5rem; 
+            color: #fff; 
+            font-weight: 400; 
+            animation: ticker-scroll 100s linear infinite; 
+            line-height: 100px;
+        }
+        @keyframes ticker-scroll { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
+
+        select { width: 100%; padding: 10px; border-radius: 8px; background: #080808; color: #fff; border: 2px solid var(--accent); font-weight: 800; cursor: pointer; font-size: 1rem; margin-bottom: 5px; }
+
+        .studio-rack {
+            width: 100%; background: #000; border-radius: 12px; margin-top: 5px; border: 2px solid #282828;
+            overflow: hidden; display: flex; flex-direction: column; flex-grow: 1; position: relative; min-height: 160px;
+            cursor: zoom-in;
+        }
+
+        #fs-spectrum-container {
+            position: fixed; inset: 0; width: 100vw; height: 100vh;
+            background: #000 !important; z-index: 999999;
+            display: flex; flex-direction: column; cursor: zoom-out; overflow: hidden;
+            transform: translateY(100%);
+            transition: transform 0.8s cubic-bezier(0.85, 0, 0.15, 1);
+        }
+        body.fs-active #fs-spectrum-container { transform: translateY(0); }
+
+        .now-playing-header { padding: 8px; border-bottom: 1px solid #1a1a1a; text-align: center; background: #050505; height: 50px; }
+        .fs-header { height: 20vh; display: flex; align-items: center; justify-content: center; background: #000; border-bottom: 4px solid var(--accent); }
+        #fs-track-title { font-size: clamp(2rem, 10vh, 7rem); color: var(--accent); text-shadow: 0 0 60px rgba(255,215,0,0.8); font-weight: 900; }
+
+        .eq { position: relative; width: 100%; height: 100%; display: flex; justify-content: center; align-items: flex-end; padding: 0 10px 20px 10px; overflow: hidden; }
+        .fs-eq { padding: 0 2vw 10vh 2vw; gap: 6px; }
+
+        .bar-container { position: relative; flex: 1; height: 100%; margin: 0 1px; }
+        .bar-led { 
+            position: absolute; bottom: 0; left: 0; right: 0;
+            width: 100%; height: 5px; 
+            background-image: repeating-linear-gradient(to top, currentColor, currentColor var(--led-height), transparent var(--led-height), transparent calc(var(--led-height) + var(--led-gap)));
+            background-color: transparent !important;
+            filter: drop-shadow(0 0 12px currentColor);
+            will-change: height;
+        }
+        .peak-led {
+            position: absolute; left: 0; right: 0; height: var(--led-height);
+            background-color: currentColor; 
+            z-index: 4; will-change: bottom;
+            box-shadow: 0 2px 10px currentColor;
+        }
+        
+        .controls-row { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 15px; margin-top: 10px; flex-shrink: 0; }
+        .play-btn { width: 75px; height: 75px; border-radius: 50%; border: 4px solid var(--accent); background: rgba(255, 215, 0, 0.1); color: var(--accent); font-weight: 900; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.3s ease; }
+        .vol-box { display: flex; flex-direction: column; align-items: flex-end; flex-grow: 1; gap: 5px; }
+        #vol-val { font-size: 1.5rem; color: var(--accent); font-weight: 900; }
+        input[type=range] { width: 100%; height: 16px; accent-color: var(--accent); cursor: pointer; background: #1a1a1a; border-radius: 10px; appearance: none; }
+        #status { font-size: 0.65rem; margin-top: 5px; color: #555; text-transform: uppercase; font-weight: 900; letter-spacing: 2px; }
+    </style>
+</head>
+<body id="radio-body">
+
+<div id="now-playing-overlay">
+    <div class="overlay-now-text">STACJA AKTYWNA:</div>
+    <div class="overlay-station-name" id="overlay-name">RADIO TWIX</div>
+</div>
+
+<div id="fs-spectrum-container">
+    <div class="fs-header"><span id="fs-track-title">RADIO TWIX LIVE</span></div>
+    <div class="eq fs-eq" id="fs-eq-div"></div>
+</div>
+
+<div class="bg-image"></div>
+<canvas id="weather-canvas"></canvas>
+
+<div class="outer-container" id="main-ui">
+    <div class="beam"></div>
+    <div class="glass-panel">
+        <div class="side-l">
+            <div id="top-content">
+                <div id="time">00<span class="dots">:</span>00</div>
+                <div id="date">Ładowanie...</div>
+                <span id="names">Imieniny: Agnieszki, Marcela, Wincentego</span>
+                
+                <div id="user-greeting" onclick="changeUser()">
+                    <span id="welcome-text">RADIO TWIX LIVE</span>
+                    <span id="motivation-text">Ładowanie inspiracji...</span>
+                </div>
+
+                <div class="weather-container">
+                    <div style="display:flex; align-items:center; gap:10px">
+                        <div id="w-icon">☀️</div>
+                        <div id="temp">--°C</div>
+                        <div>
+                            <div id="weather-desc" style="font-weight: 800; font-size: 1rem;">ŁADOWANIE...</div>
+                            <div id="w-details" style="opacity:0.7; font-size: 0.85rem;">Aleksandrów Kujawski</div>
+                        </div>
+                    </div>
+                    <div style="font-size: 0.85rem; margin-top: 8px; opacity: 0.95; padding-top: 15px;"> Wilgotność: <b id="hum" style="color:var(--accent)">--</b>% | Ciśnienie: <b id="press" style="color:var(--accent)">--</b> hPa
+                    </div>
+                </div>
+            </div>
+            
+            <div class="ticker" id="ticker-box">
+                <div id="news-container">Serwis Informacyjny Radio TWIX +++ Przetwarzanie... +++ </div>
+            </div>
+        </div>
+        <div class="side-r">
+            <select id="station">
+                <option value="">-- WYBIERZ STACJĘ --</option>
+                <option value="https://an.cdn.eurozet.pl/ant-waw.mp3">🎸 01. Antyradio</option>
+                <option value="https://hub.radiostream.pl/stream.pls?radio=8800&type=none&app=none&coding=mp3&redirect=true">🎧 02. Meloradio</option>
+                <option value="https://stream.rcs.revma.com/ye5kghkgcm0uv">📻 03. Radio 357</option>
+                <option value="http://waw.ic.smcdn.pl/2130-1.mp3">📻 04. Radio ESKA Toruń</option>
+                <option value="http://rmfstream2.interia.pl:8000/radio_gra">🎧 05. Radio GRA Toruń</option>
+                <option value="https://stream.rcs.revma.com/nrfscb49xd3vv">🎙️ 06. Radio Kolor</option>
+                <option value="https://zt02.cdn.eurozet.pl/ZETPL1.mp3">📻 07. Radio Zet</option>
+                <option value="https://tn02.cdn.eurozet.pl/TOA-INT.mp3">🎙️ 08. TOK FM</option>
+                <option value="http://217.74.72.11/rmf_fm">🎶 09. RMF FM</option>
+                <option value="https://rs202-krk-cyfronet.rmfstream.pl/MAXXXBYD">📡 10. RMF MaxX</option>
+                <option value="https://waw01.ic.smcdn.pl/t049-1.mp3">🎶 11. VOX FM</option>
+                <option value="http://waw.ic.smcdn.pl/3990-1.mp3">📻 12. Eska ROCK</option>
+                <option value="http://pldm.vip/64.mp3">🎧 13. Deep House</option>
+            </select>
+            <div class="studio-rack" id="visualizer-trigger">
+                <div class="now-playing-header"><span id="track-title" style="color: #fff; font-weight: 900; letter-spacing: 1px; font-size: 0.9rem;">READY</span></div>
+                <div class="eq" id="eq-div"></div>
+            </div>
+            <div class="controls-row">
+                <button id="play" class="play-btn">PLAY</button>
+                <div class="vol-box">
+                    <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--accent); font-weight: 900;">VOL <span id="vol-val">100</span></div>
+                    <input type="range" min="0" max="1" step="0.01" id="vol" value="1.0">
+                </div>
+            </div>
+            <div id="status">V79.0 | MID +20% | HIGH +30% | LAYOUT FIX</div>
+        </div>
+    </div>
+</div>
+
+<audio id="main-audio" crossorigin="anonymous"></audio>
+
+<script>
+    const API_KEY = "5be3ab871701c12779b25946e4212604";
+    const audio = document.getElementById('main-audio');
+    const volSlider = document.getElementById('vol');
+    const trackDisplay = document.getElementById('track-title');
+    const fsTrackDisplay = document.getElementById('fs-track-title');
+    const overlay = document.getElementById('now-playing-overlay');
+    const overlayName = document.getElementById('overlay-name');
+    const radioBody = document.getElementById('radio-body');
+    const motivationEl = document.getElementById('motivation-text');
+    
+    let audioCtx, analyser, dataArray;
+    const BAR_COUNT = 32; 
+    const barsNormal = [], peaksNormal = [], peakValuesNormal = [], peakSpeedsNormal = [];
+    const barsFS = [], peaksFS = [], peakValuesFS = [], peakSpeedsFS = [];
+
+    function createBars(container, barArr, peakArr, valArr, speedArr) {
+        for(let i=0; i<BAR_COUNT; i++){ 
+            const wrap = document.createElement("div"); wrap.classList.add("bar-container");
+            const b = document.createElement("div"); b.classList.add("bar-led");
+            const p = document.createElement("div"); p.classList.add("peak-led");
+            const hue = (i / BAR_COUNT) * 110; const color = `hsl(${hue}, 100%, 50%)`;
+            b.style.color = color; p.style.color = color;
+            wrap.appendChild(p); wrap.appendChild(b);
+            container.appendChild(wrap); barArr.push(b); peakArr.push(p); valArr.push(0); speedArr.push(0);
+        }
+    }
+
+    createBars(document.getElementById("eq-div"), barsNormal, peaksNormal, peakValuesNormal, peakSpeedsNormal);
+    createBars(document.getElementById("fs-eq-div"), barsFS, peaksFS, peakValuesFS, peakSpeedsFS);
+
+    document.getElementById('visualizer-trigger').onclick = () => { radioBody.classList.add('fs-active'); };
+    document.getElementById('fs-spectrum-container').onclick = () => { radioBody.classList.remove('fs-active'); };
+
+    function showStationOverlay(name) {
+        overlayName.textContent = name;
+        overlay.classList.remove('fade-out');
+        overlay.classList.add('active');
+        overlay.style.display = 'flex';
+        setTimeout(() => {
+            overlay.classList.add('fade-out');
+            setTimeout(() => { 
+                overlay.classList.remove('active'); 
+                overlay.style.display = 'none';
+            }, 600);
+        }, 3000);
+    }
+
+    function initAudio() {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            analyser = audioCtx.createAnalyser();
+            const source = audioCtx.createMediaElementSource(audio);
+            source.connect(analyser); analyser.connect(audioCtx.destination);
+            analyser.fftSize = 1024;
+            analyser.smoothingTimeConstant = 0.42;
+            dataArray = new Uint8Array(analyser.frequencyBinCount);
+            drawLoop();
+        }
+    }
+
+    function drawLoop() {
+        requestAnimationFrame(drawLoop);
+        if(!audio.paused && analyser) {
+            analyser.getByteFrequencyData(dataArray);
+            const isFS = radioBody.classList.contains('fs-active');
+            const activeBars = isFS ? barsFS : barsNormal;
+            const activePeaks = isFS ? peaksFS : peaksNormal;
+            const activeValues = isFS ? peakValuesFS : peakValuesNormal;
+            const activeSpeeds = isFS ? peakSpeedsFS : peakSpeedsNormal;
+            const eqHeight = isFS ? window.innerHeight * 0.55 : 140;
+
+            for(let i = 0; i < BAR_COUNT; i++) {
+                let val = 0;
+                let raw = 0;
+                
+                if (i < 5) { // BASS
+                    raw = dataArray[i + 1];
+                    let threshold = 185;
+                    if(raw > threshold) {
+                        val = Math.pow((raw - threshold) / (255 - threshold), 1.4) * 255;
+                    }
+                } else if (i < 20) { // MID (+20% Sensitivity)
+                    raw = dataArray[i * 2 + 8];
+                    let threshold = 110; 
+                    if(raw > threshold) {
+                        val = Math.pow((raw - threshold) / (255 - threshold), 1.45) * 255 * 1.2;
+                    }
+                } else { // HIGH (+30% Sensitivity)
+                    raw = dataArray[i * 4];
+                    let threshold = 85; 
+                    if(raw > threshold) {
+                        val = Math.pow((raw - threshold) / (255 - threshold), 1.7) * 255 * 1.3;
+                    }
+                }
+
+                if(val > 255) val = 255;
+                if(val < 0) val = 0;
+                
+                let h = (val / 255) * eqHeight;
+                h = Math.floor(h / 5) * 5; 
+                activeBars[i].style.height = Math.max(5, h) + "px";
+                
+                let fallAccel = (h < activeValues[i] * 0.4) ? 0.75 : 0.35;
+                
+                if (h >= activeValues[i]) { 
+                    activeValues[i] = h; 
+                    activeSpeeds[i] = 0.5; 
+                } else { 
+                    activeSpeeds[i] += fallAccel; 
+                    activeValues[i] -= activeSpeeds[i]; 
+                }
+                
+                if (activeValues[i] < 0) activeValues[i] = 0;
+                activePeaks[i].style.bottom = activeValues[i] + "px";
+                activePeaks[i].style.opacity = activeValues[i] > 10 ? 1 : 0.3;
+            }
+        }
+    }
+
+    function clock() {
+        const d = new Date();
+        const h = String(d.getHours()).padStart(2, '0');
+        const m = String(d.getMinutes()).padStart(2, '0');
+        document.getElementById("time").innerHTML = `${h}<span class="dots">:</span>${m}`;
+        document.getElementById("date").innerHTML = `<span class="day-name">${d.toLocaleDateString('pl-PL', {weekday:'long'})}</span><span class="day-num">${d.getDate()}</span><span class="month-name">${d.toLocaleDateString('pl-PL', {month:'long'})}</span>`;
+        
+        // Reguła 3 AM
+        if(h === "03" && m === "00") {
+            document.documentElement.style.setProperty('--neon', '#39ff14');
+            document.body.style.filter = "brightness(1.05)";
+        }
+    }
+    setInterval(clock, 1000); clock();
+
+    function updateMotivation() {
+        const name = localStorage.getItem('radioUserName') || "";
+        const quotes = [
+            "Dzisiaj jest Twój dzień na podbój świata!",
+            "Muzyka to paliwo dla duszy.",
+            "Wszystko co robisz, rób z pasją.",
+            "Złap rytm i nie puszczaj!",
+            "Każda nuta to nowa szansa.",
+            "Rób swoje, reszta przyjdzie sama.",
+            "Bądź dzisiaj najlepszą wersją siebie!",
+            "Energia to Twoje drugie imię."
+        ];
+        const personalQuotes = [
+            `${name}, zrób dzisiaj coś niesamowitego!`,
+            `${name}, Twój gust muzyczny jest genialny.`,
+            `${name}, niech bas prowadzi Cię przez dzień.`,
+            `Uśmiechnij się ${name} – Radio TWIX gra!`,
+            `To będzie legendarny dzień, ${name}!`
+        ];
+
+        const list = name ? personalQuotes.concat(quotes) : quotes;
+        const randomQuote = list[Math.floor(Math.random() * list.length)];
+        
+        motivationEl.style.opacity = 0;
+        setTimeout(() => {
+            motivationEl.textContent = randomQuote.toUpperCase();
+            motivationEl.style.opacity = 0.8;
+        }, 500);
+    }
+    setInterval(updateMotivation, 30000); updateMotivation();
+
+    const st = document.getElementById("station"); const pb = document.getElementById("play");
+    st.onchange = () => { 
+        if(!st.value) return; 
+        initAudio(); 
+        const name = st.options[st.selectedIndex].text.split('. ')[1].toUpperCase();
+        trackDisplay.textContent = name; fsTrackDisplay.textContent = name;
+        showStationOverlay(name);
+        audio.src = st.value; audio.play().then(() => { pb.textContent = "STOP"; }); 
+    };
+    pb.onclick = () => { initAudio(); if(audio.paused) { if(audio.src) { audio.play(); pb.textContent="STOP"; } } else { audio.pause(); pb.textContent="PLAY"; } };
+    volSlider.oninput = (e) => { audio.volume = e.target.value; document.getElementById('vol-val').textContent = Math.round(e.target.value * 100); };
+
+    const cvs = document.getElementById("weather-canvas"); const ctx = cvs.getContext("2d");
+    let clouds = [];
+    function initWeather() {
+        cvs.width = window.innerWidth; cvs.height = window.innerHeight; clouds = [];
+        for(let i=0; i<8; i++) clouds.push({ x: Math.random()*cvs.width, y: Math.random()*(cvs.height/2), s: 0.15, r: 100 });
+    }
+    function animate() {
+        ctx.clearRect(0,0,cvs.width,cvs.height); ctx.fillStyle = "rgba(255,255,255,0.06)";
+        clouds.forEach(c => { c.x += c.s; if(c.x > cvs.width+c.r) c.x = -c.r; ctx.beginPath(); ctx.ellipse(c.x, c.y, c.r, c.r*0.4, 0, 0, Math.PI*2); ctx.fill(); });
+        requestAnimationFrame(animate);
+    }
+    window.onresize = initWeather; initWeather(); animate();
+
+    async function updateWeather() {
+        try {
+            const r = await fetch(`https://api.openweathermap.org/data/2.5/weather?q=Aleksandrow%20Kujawski,pl&appid=${API_KEY}&units=metric&lang=pl`);
+            const wd = await r.json();
+            document.getElementById("temp").textContent = Math.round(wd.main.temp) + "°C";
+            document.getElementById("weather-desc").textContent = wd.weather[0].description.toUpperCase();
+            document.getElementById("hum").textContent = wd.main.humidity;
+            document.getElementById("press").textContent = wd.main.pressure;
+        } catch(e) {}
+    }
+    updateWeather(); setInterval(updateWeather, 600000);
+
+    function changeUser() { let name = prompt("Jak masz na imię?", ""); if (name) { localStorage.setItem('radioUserName', name); location.reload(); } }
+    (function initUser() { 
+        let name = localStorage.getItem('radioUserName'); 
+        if(name) { document.getElementById("welcome-text").textContent = "WITAJ, " + name.toUpperCase() + "!"; }
+    })();
+
+    async function fetchNews() {
+        try {
+            const res = await fetch('https://api.rss2json.com/v1/api.json?rss_url=https%3A%2F%2Fwiadomosci.wp.pl%2Frss.xml');
+            const data = await res.json();
+            if(data.items) {
+                const combinedNews = data.items.map(i => `+++ ${i.title}`).join(' ');
+                document.getElementById('news-container').textContent = combinedNews + " +++ ";
+            }
+        } catch(e) {}
+    }
+    fetchNews(); setInterval(fetchNews, 1800000);
+</script>
+</body>
+</html>
+

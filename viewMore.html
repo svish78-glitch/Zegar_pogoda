@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Neon Glass Control Panel</title>
+    <style>
+        :root {
+            --neon-green: #b8ffcc;
+            --ufc: #FF2E2E;
+            --kino: #FFD700;
+            --cold: #00FFFF;
+            --stitch: #4169E1;
+            --radio-gold: #ff9d00;
+            --purple: #BF00FF;
+            --task: #00e5ff;
+            --bg-dark: #050505;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            background-image: url('https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1950&q=80');
+            background-size: cover;
+            background-position: center;
+            color: white;
+            font-family: 'Segoe UI', sans-serif;
+            margin: 0;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.75);
+            z-index: 0;
+        }
+
+        .clouds-layer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 50%;
+            background: linear-gradient(to bottom, rgba(184, 255, 204, 0.1), transparent);
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .header {
+            padding: 14px 20px;
+            text-align: center;
+            z-index: 2;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            position: relative;
+        }
+
+        .header h1 {
+            color: var(--neon-green);
+            margin: 0;
+            font-size: 1.1rem;
+            text-transform: uppercase;
+            letter-spacing: 5px;
+            text-shadow: 0 0 15px var(--neon-green);
+        }
+
+        /* ── Przycisk Pomoc ── */
+        .btn-help {
+            position: absolute;
+            right: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(255,255,255,0.1);
+            border: 1.5px solid rgba(255,255,255,0.35);
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 1rem;
+            color: white;
+            z-index: 10;
+            backdrop-filter: blur(8px);
+            transition: background 0.2s, box-shadow 0.2s;
+        }
+        .btn-help:active {
+            background: rgba(184,255,204,0.2);
+            box-shadow: 0 0 12px var(--neon-green);
+        }
+
+        /* ── Popup Pomoc ── */
+        .help-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.72);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+        }
+        .help-overlay.visible { display: flex; }
+
+        .help-box {
+            background: rgba(10,20,15,0.92);
+            border: 1.5px solid var(--neon-green);
+            box-shadow: 0 0 30px rgba(184,255,204,0.25), 0 0 6px rgba(184,255,204,0.15) inset;
+            backdrop-filter: blur(20px);
+            border-radius: 16px;
+            padding: 24px 22px 20px;
+            max-width: 320px;
+            width: 90%;
+            color: white;
+            position: relative;
+        }
+
+        .help-box h2 {
+            margin: 0 0 16px;
+            font-size: 1rem;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: var(--neon-green);
+            text-shadow: 0 0 10px var(--neon-green);
+            text-align: center;
+        }
+
+        .help-close {
+            position: absolute;
+            top: 10px; right: 14px;
+            font-size: 1.3rem;
+            cursor: pointer;
+            opacity: 0.6;
+            line-height: 1;
+        }
+        .help-close:active { opacity: 1; }
+
+        .gesture-list {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .gesture-list li {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            font-size: 0.82rem;
+            line-height: 1.4;
+            padding: 8px 10px;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+
+        .gesture-icon {
+            font-size: 1.3rem;
+            min-width: 28px;
+            text-align: center;
+            margin-top: 1px;
+        }
+
+        .gesture-desc strong {
+            display: block;
+            font-size: 0.75rem;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: var(--neon-green);
+            margin-bottom: 2px;
+        }
+
+        .gesture-desc span {
+            opacity: 0.75;
+        }
+
+        /* ── Grid ── */
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-gap: 12px;
+            padding: 10px 15px 15px;
+            flex-grow: 1;
+            z-index: 2;
+            align-content: start;
+        }
+
+        /* ── Tile base ── */
+        .tile {
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            border: 2px solid var(--neon-color);
+            box-shadow: 0 0 12px var(--neon-color), inset 0 0 6px rgba(0,0,0,0.4);
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            text-transform: uppercase;
+            font-weight: 900;
+            font-size: 0.75rem;
+            height: 85px;
+            text-shadow: 0 0 6px rgba(0,0,0,0.9), 0 0 10px rgba(0,0,0,0.7);
+            color: white;
+            text-decoration: none;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Overlay ciemny na każdym kafelku dla czytelności tekstu */
+        .tile::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,0.32);
+            border-radius: 10px;
+            z-index: 0;
+        }
+
+        .tile > * { position: relative; z-index: 1; }
+        .tile > span, .tile > div { position: relative; z-index: 1; }
+
+        /* Tekst kafelka ponad overlay */
+        .tile { line-height: 1.4; }
+
+        .tile:active {
+            transform: scale(0.92);
+            box-shadow: 0 0 28px var(--neon-color);
+        }
+
+        /* ── Kolory neonowe ── */
+        .plus  { --neon-color: var(--cold); }
+        .mma   { --neon-color: var(--ufc); }
+        .kino  { --neon-color: var(--kino); }
+        .ramka { --neon-color: var(--purple); }
+        .radio { --neon-color: var(--radio-gold); }
+        .smart { --neon-color: var(--neon-green); }
+        .plan  { --neon-color: var(--stitch); }
+        .task  { --neon-color: var(--task); }
+
+        /* ── Tła kafelków ── */
+        .plus {
+            background:
+                linear-gradient(135deg, rgba(0,255,255,0.18) 0%, rgba(0,80,120,0.35) 100%),
+                url('https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=400&q=60') center/cover no-repeat;
+        }
+
+        .mma {
+            background:
+                linear-gradient(135deg, rgba(255,46,46,0.3) 0%, rgba(80,0,0,0.5) 100%),
+                url('https://images.unsplash.com/photo-1549438590-eb2d3a3aaacb?auto=format&fit=crop&w=400&q=60') center/cover no-repeat;
+        }
+
+        .kino {
+            background:
+                linear-gradient(135deg, rgba(255,215,0,0.25) 0%, rgba(80,40,0,0.45) 100%),
+                url('https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=400&q=60') center/cover no-repeat;
+        }
+
+        .ramka {
+            background:
+                linear-gradient(135deg, rgba(191,0,255,0.25) 0%, rgba(40,0,70,0.5) 100%),
+                url('https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=400&q=60') center/cover no-repeat;
+        }
+
+        .radio {
+            background:
+                linear-gradient(135deg, rgba(255,157,0,0.28) 0%, rgba(70,30,0,0.5) 100%),
+                url('https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=60') center/cover no-repeat;
+        }
+
+        .smart {
+            background:
+                linear-gradient(135deg, rgba(0,255,100,0.2) 0%, rgba(0,40,20,0.5) 100%),
+                url('https://images.unsplash.com/photo-1558618666-fcd25c85cd64?auto=format&fit=crop&w=400&q=60') center/cover no-repeat;
+        }
+
+        .plan {
+            background:
+                linear-gradient(135deg, rgba(65,105,225,0.3) 0%, rgba(10,20,80,0.5) 100%),
+                url('https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=700&q=60') center/cover no-repeat;
+        }
+
+        .task {
+            background:
+                linear-gradient(135deg, rgba(0,229,255,0.22) 0%, rgba(0,40,60,0.5) 100%),
+                url('https://images.unsplash.com/photo-1484480974693-6ca0a78fb36b?auto=format&fit=crop&w=700&q=60') center/cover no-repeat;
+        }
+
+        /* ── Footer ── */
+        .footer {
+            padding: 12px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            z-index: 2;
+        }
+
+        .battery-sec { font-size: 1.2rem; font-weight: 900; text-shadow: 0 0 10px var(--neon-green); }
+
+        .sync-sec {
+            margin-top: 35px;
+            font-size: 0.7rem;
+            opacity: 0.7;
+            font-family: monospace;
+            letter-spacing: 1px;
+        }
+    </style>
+</head>
+<body>
+    <div class="clouds-layer"></div>
+
+    <div class="header">
+        <h1>Neon Control Center</h1>
+        <div class="btn-help" onclick="showHelp()" title="Pomoc">❓</div>
+    </div>
+
+    <div class="grid-container">
+        <div class="tile plus"  onclick="location.href='viewPlus.html'">Plus</div>
+        <div class="tile mma"   onclick="location.href='viewMMA.html'">MMA</div>
+        <div class="tile kino"  onclick="location.href='viewKino.html'">Kino</div>
+
+        <div class="tile ramka" onclick="location.href='viewRamka.html'">Ramka</div>
+        <div class="tile radio" onclick="location.href='radio.html'">📻 Radio</div>
+        <div class="tile smart" onclick="location.href='viewSmart.html'">Smart</div>
+
+        <div class="tile plan" onclick="location.href='viewPlan.html'" style="grid-column: span 2;">
+            📅 Plan Lekcji (Stitch)
+        </div>
+
+        <div class="tile task" onclick="location.href='viewTask.html'">
+            ✅ Zadania
+        </div>
+    </div>
+
+    <div class="footer">
+        <div>
+            <div style="font-size: 0.6rem; opacity: 0.5; margin-bottom: 5px;">ID: ktjgtmehdk7w7xyuxpn3</div>
+            <div class="battery-sec">🔋 <span id="batVal">--%</span></div>
+        </div>
+        <div class="sync-sec" id="clock">SYNC: 00:00:00</div>
+    </div>
+
+    <!-- ── POPUP POMOC ── -->
+    <div class="help-overlay" id="helpOverlay" onclick="closeHelpOutside(event)">
+        <div class="help-box" id="helpBox">
+            <div class="help-close" onclick="hideHelp()">✕</div>
+            <h2>⚡ Gesty &amp; Skróty</h2>
+            <ul class="gesture-list">
+                <li>
+                    <span class="gesture-icon">👆</span>
+                    <div class="gesture-desc">
+                        <strong>Dotknięcie kafelka</strong>
+                        <span>Otwiera daną sekcję aplikacji</span>
+                    </div>
+                </li>
+                <li>
+                    <span class="gesture-icon">👈</span>
+                    <div class="gesture-desc">
+                        <strong>Swipe w lewo</strong>
+                        <span>Przejście do następnego ekranu / widoku</span>
+                    </div>
+                </li>
+                <li>
+                    <span class="gesture-icon">👉</span>
+                    <div class="gesture-desc">
+                        <strong>Swipe w prawo</strong>
+                        <span>Powrót do poprzedniego widoku</span>
+                    </div>
+                </li>
+                <li>
+                    <span class="gesture-icon">👇</span>
+                    <div class="gesture-desc">
+                        <strong>Swipe w dół</strong>
+                        <span>Powrót do ekranu głównego <strong style="color:var(--neon-green)">pogoda.html</strong></span>
+                    </div>
+                </li>
+                <li>
+                    <span class="gesture-icon">🕐</span>
+                    <div class="gesture-desc">
+                        <strong>Zegar / SYNC</strong>
+                        <span>Wyświetla aktualny czas w stopce</span>
+                    </div>
+                </li>
+                <li>
+                    <span class="gesture-icon">🔋</span>
+                    <div class="gesture-desc">
+                        <strong>Bateria</strong>
+                        <span>Poziom naładowania urządzenia w stopce</span>
+                    </div>
+                </li>
+                <li>
+                    <span class="gesture-icon">↩️</span>
+                    <div class="gesture-desc">
+                        <strong>Podwójne kliknięcie tła</strong>
+                        <span>Powrót do <strong style="color:var(--neon-green)">pogoda.html</strong></span>
+                    </div>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        /* ── POMOC ── */
+        function showHelp() {
+            document.getElementById('helpOverlay').classList.add('visible');
+        }
+        function hideHelp() {
+            document.getElementById('helpOverlay').classList.remove('visible');
+        }
+        function closeHelpOutside(e) {
+            if (e.target === document.getElementById('helpOverlay')) hideHelp();
+        }
+
+        /* ── BATERIA ── */
+        if (navigator.getBattery) {
+            navigator.getBattery().then(batt => {
+                const update = () => document.getElementById('batVal').innerText = Math.round(batt.level * 100) + '%';
+                update(); batt.onlevelchange = update;
+            });
+        }
+
+        /* ── ZEGAR ── */
+        function updateClock() {
+            document.getElementById('clock').innerText = 'SYNC: ' + new Date().toLocaleTimeString();
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        /* ── SWIPE W DÓŁ → pogoda.html ── */
+        let touchStartY = 0;
+        document.addEventListener('touchstart', e => { touchStartY = e.touches[0].clientY; }, { passive: true });
+        document.addEventListener('touchend', e => {
+            const dy = e.changedTouches[0].clientY - touchStartY;
+            if (dy > 80) window.location.href = 'pogoda.html';
+        });
+
+        /* ── PODWÓJNE KLIKNIĘCIE TŁA → pogoda.html ── */
+        document.body.addEventListener('dblclick', (e) => {
+            if (e.target === document.body || e.target.classList.contains('grid-container')) {
+                window.location.href = 'pogoda.html';
+            }
+        });
+    </script>
+</body>
+</html>
